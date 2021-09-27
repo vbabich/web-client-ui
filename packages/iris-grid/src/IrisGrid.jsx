@@ -24,6 +24,7 @@ import {
   dhGraphLineUp,
   dhTriangleDownSquare,
   vsCloudDownload,
+  vsEdit,
   vsFilter,
   vsMenu,
   vsRuby,
@@ -86,6 +87,7 @@ import AdvancedSettingsType from './sidebar/AdvancedSettingsType';
 import AdvancedSettingsMenu from './sidebar/AdvancedSettingsMenu';
 import SHORTCUTS from './IrisGridShortcuts';
 import DateUtils from './DateUtils';
+import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
 
 const log = Log.module('IrisGrid');
 
@@ -163,7 +165,9 @@ export class IrisGrid extends Component {
     this.handleTooltipRef = this.handleTooltipRef.bind(this);
     this.handleViewChanged = this.handleViewChanged.bind(this);
     this.handleFormatSelection = this.handleFormatSelection.bind(this);
-
+    this.handleConditionalFormatsChange = this.handleConditionalFormatsChange.bind(
+      this
+    );
     this.handleUpdateCustomColumns = this.handleUpdateCustomColumns.bind(this);
     this.handleCustomColumnsChanged = this.handleCustomColumnsChanged.bind(
       this
@@ -276,6 +280,7 @@ export class IrisGrid extends Component {
     ];
     const {
       aggregationSettings,
+      conditionalFormats,
       customColumnFormatMap,
       isFilterBarShown,
       isSelectingPartition,
@@ -353,6 +358,8 @@ export class IrisGrid extends Component {
       formatter: new Formatter(),
       isMenuShown: false,
       customColumnFormatMap: new Map(customColumnFormatMap),
+
+      conditionalFormats,
 
       // Column user is hovering over for selection
       hoverSelectColumn: null,
@@ -530,6 +537,11 @@ export class IrisGrid extends Component {
         type: OptionType.VISIBILITY_ORDERING_BUILDER,
         title: 'Column Visibility & Ordering',
         icon: dhEye,
+      });
+      optionItems.push({
+        type: OptionType.CONDITIONAL_FORMATTING,
+        title: 'Conditional Formatting',
+        icon: vsEdit,
       });
       if (isCustomColumnsAvailable) {
         optionItems.push({
@@ -1910,6 +1922,11 @@ export class IrisGrid extends Component {
     this.tooltip = tooltip;
   }
 
+  handleConditionalFormatsChange(conditionalFormats) {
+    log.debug('handleConditionalFormatsChange', conditionalFormats);
+    this.setState({ conditionalFormats });
+  }
+
   handleUpdateCustomColumns(customColumns) {
     log.info(`handleUpdateCustomColumns:`, customColumns);
 
@@ -2269,6 +2286,7 @@ export class IrisGrid extends Component {
       movedRows,
 
       formatter,
+      conditionalFormats,
 
       sorts,
       reverseType,
@@ -2721,6 +2739,14 @@ export class IrisGrid extends Component {
               key={OptionType.VISIBILITY_ORDERING_BUILDER}
             />
           );
+        case OptionType.CONDITIONAL_FORMATTING:
+          return (
+            <ConditionalFormattingMenu
+              columns={model.columns}
+              rules={conditionalFormats}
+              onChange={this.handleConditionalFormatsChange}
+            />
+          );
         case OptionType.CUSTOM_COLUMN_BUILDER:
           return (
             <CustomColumnBuilder
@@ -3014,6 +3040,7 @@ IrisGrid.propTypes = {
   alwaysFetchColumns: PropTypes.arrayOf(PropTypes.string),
   isFilterBarShown: PropTypes.bool,
   applyInputFiltersOnInit: PropTypes.bool,
+  conditionalFormats: PropTypes.arrayOf(PropTypes.string),
   customColumnFormatMap: PropTypes.instanceOf(Map),
   movedColumns: PropTypes.arrayOf(
     PropTypes.shape({
@@ -3107,6 +3134,7 @@ IrisGrid.defaultProps = {
   advancedFilters: new Map(),
   advancedSettings: new Map(),
   alwaysFetchColumns: [],
+  conditionalFormats: [],
   customColumnFormatMap: new Map(),
   isFilterBarShown: false,
   applyInputFiltersOnInit: false,

@@ -1,0 +1,15 @@
+@import '../../../components/scss/custom.scss';
+
+.conditional-formatting-editor {
+  padding: $spacer-3;
+
+  .col-formatter-type {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .btn-formatter-type {
+    font-size: smaller;
+    width: 100%;
+  }
+}

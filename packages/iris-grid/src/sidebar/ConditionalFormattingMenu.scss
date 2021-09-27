@@ -1,0 +1,46 @@
+@import '../../../components/scss/custom.scss';
+
+.conditional-formatting-rules {
+  padding: $spacer-1;
+}
+
+.conditional-formatting-list-item {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 2px;
+  padding: 0 $spacer-1;
+
+  &:first-child {
+    padding-top: $spacer-1;
+  }
+
+  .formatting-item {
+    border-radius: $border-radius;
+    display: flex;
+    // justify-content: space-between;
+    padding: 0 0 0 $spacer-2;
+    flex-grow: 1;
+    align-items: center;
+    user-select: none;
+    transition: $btn-transition;
+    border: $input-border-width solid transparent;
+    line-height: $btn-line-height;
+    .rule-title {
+      overflow-x: hidden;
+      text-overflow: ellipsis;
+      padding-right: 2px;
+      display: flex;
+      flex-grow: 1;
+    }
+
+    &:focus {
+      outline: 0;
+      border: $input-border-width solid $input-focus-border-color;
+      box-shadow: $input-focus-box-shadow;
+    }
+
+    &:hover {
+      background: $gray-500;
+    }
+  }
+}
