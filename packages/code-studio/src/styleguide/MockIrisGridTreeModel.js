@@ -130,6 +130,12 @@ class MockIrisGridTreeModel extends IrisGridModel {
 
   set customColumns(customColumns) {}
 
+  get formatColumns() {
+    return [];
+  }
+
+  set formatColumns(formatColumns) {}
+
   get sort() {
     return [];
   }

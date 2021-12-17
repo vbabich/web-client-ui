@@ -88,6 +88,10 @@ import AdvancedSettingsMenu from './sidebar/AdvancedSettingsMenu';
 import SHORTCUTS from './IrisGridShortcuts';
 import DateUtils from './DateUtils';
 import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
+import {
+  getColorForStyleType,
+  getTextForConditionType,
+} from './sidebar/ConditionalFormattingEditor';
 
 const log = Log.module('IrisGrid');
 
@@ -646,6 +650,36 @@ export class IrisGrid extends Component {
       .map(a => a.operation)
       .filter(o => !AggregationUtils.isRollupOperation(o))
   );
+
+  getFormatColumns = memoize((columns, config) => {
+    log.debug('getFormatColumns', columns, config);
+    return config
+      .map(({ config: formatConfig, column }) => {
+        // TODO: do we need to check both name and type?
+        // see if this conflicts with renamed custom columns etc
+        const col = columns.find(
+          ({ name, type }) => name === column.name && type === column.type
+        );
+        if (!col) {
+          return null;
+        }
+        const value = TableUtils.isNumberType(col.type)
+          ? formatConfig.value
+          : `"${formatConfig.value}"`;
+
+        const combinedColumnRule = null;
+
+        return col.formatColor(
+          `${col.name} ${getTextForConditionType(
+            col.type,
+            formatConfig.condition
+          )} ${value} ?  bgfga(${getColorForStyleType(
+            formatConfig.style.type
+          )}) : ${combinedColumnRule}`
+        );
+      })
+      .filter(formatColumn => formatColumn !== null);
+  });
 
   getModelRollupConfig = memoize(
     (originalColumns, config, aggregationSettings) =>
@@ -2922,6 +2956,10 @@ export class IrisGrid extends Component {
                   model.columns,
                   model.floatingLeftColumnCount,
                   model.floatingRightColumnCount
+                )}
+                formatColumns={this.getFormatColumns(
+                  model.columns,
+                  conditionalFormats
                 )}
                 rollupConfig={this.getModelRollupConfig(
                   model.originalColumns,

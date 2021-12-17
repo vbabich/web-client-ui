@@ -5,13 +5,20 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { dhNewCircleLargeFilled, vsGripper, vsTrash } from '@deephaven/icons';
 import { Button, DragUtils, Tooltip } from '@deephaven/components';
 import Log from '@deephaven/log';
-import ConditionalFormattingEditor from './ConditionalFormattingEditor';
+import ConditionalFormattingEditor, {
+  ConditionConfig,
+  FormatterType,
+  FormattingRule,
+  getTextForConditionType,
+} from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
 
 const log = Log.module('ConditionalFormattingMenu');
 
-export type ConditionalFormattingMenuCallback = (rules: string[]) => void;
+export type ConditionalFormattingMenuCallback = (
+  rules: FormattingRule[]
+) => void;
 
 export type ModelColumn = {
   name: string;
@@ -19,7 +26,7 @@ export type ModelColumn = {
 };
 
 export type ConditionalFormattingMenuProps = {
-  rules: string[];
+  rules: FormattingRule[];
   columns: ModelColumn[];
   selectedColumn?: string;
   onChange?: ConditionalFormattingMenuCallback;
@@ -42,11 +49,11 @@ const ConditionalFormattingMenu = (
   }, []);
 
   const handleApply = useCallback(
-    (update, style, index) => {
-      log.debug('Apply formatting', style);
+    (rule, index) => {
+      log.debug('Apply formatting', rule);
       setCreateNewRule(false);
       if (index === undefined) {
-        onChange([...rules, update]);
+        onChange([...rules, rule]);
         return;
       }
       if (index < 0 || index >= rules.length) {
@@ -54,7 +61,7 @@ const ConditionalFormattingMenu = (
         return;
       }
       const updatedRules = [...rules];
-      updatedRules[index] = update;
+      updatedRules[index] = rule;
       onChange(updatedRules);
     },
     [onChange, rules]
@@ -138,8 +145,8 @@ const ConditionalFormattingMenu = (
               {rules.map((rule, index) => (
                 <Draggable
                   // eslint-disable-next-line react/no-array-index-key
-                  key={`${index}-${rule}`}
-                  draggableId={`${index}-${rule}`}
+                  key={`${index}-${rule.type}`}
+                  draggableId={`${index}-${rule.type}`}
                   index={index}
                   disableInteractiveElementBlocking
                 >
@@ -159,7 +166,18 @@ const ConditionalFormattingMenu = (
                       >
                         <div className="conditional-formatting-list-item">
                           <div className="formatting-item">
-                            <div className="rule-title">{rule}</div>
+                            <div className="rule-title">
+                              {rule.column.name}{' '}
+                              {rule.type === FormatterType.CONDITIONAL
+                                ? `${getTextForConditionType(
+                                    rule.column.type,
+                                    (rule.config as ConditionConfig).condition
+                                  )} `
+                                : null}
+                              {rule.type === FormatterType.CONDITIONAL
+                                ? (rule.config as ConditionConfig).value
+                                : null}
+                            </div>
                             <button
                               type="button"
                               className="btn btn-link btn-link-icon ml-1 px-2"

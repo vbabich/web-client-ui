@@ -15,8 +15,7 @@ import './ConditionalFormattingEditor.scss';
 const log = Log.module('ConditionalFormattingEditor');
 
 export type ConditionalFormattingApplyCallback = (
-  update: string,
-  style: FormatStyleType,
+  rule: FormattingRule,
   index?: number
 ) => void;
 
@@ -93,7 +92,6 @@ export interface FormatStyleConfig {
 }
 
 export interface ConditionConfig {
-  column: string;
   condition: NumberFormatCondition | StringFormatCondition;
   value?: string | number;
   start?: number;
@@ -102,13 +100,11 @@ export interface ConditionConfig {
 }
 
 export interface AdvancedConditionConfig {
-  column: string;
   condition: string;
   style: FormatStyleConfig;
 }
 
 export interface ProgressConfig {
-  column: string;
   style: FormatStyleConfig;
   startType: FormatPointType;
   endType: FormatPointType;
@@ -120,7 +116,6 @@ export interface ProgressConfig {
 export interface ColorScaleConfig {
   // TODO: heatmap on non-number columns?
   // TODO: only show numeric columns in the selector?
-  column: string;
   scale: ColorScaleType;
   startType: FormatPointType;
   // Optional depending on the scale
@@ -137,6 +132,7 @@ export type RowsConfig = ConditionConfig;
 
 export interface FormattingRule {
   type: FormatterType;
+  column: ModelColumn;
   config:
     | ConditionConfig
     | AdvancedConditionConfig
@@ -193,6 +189,54 @@ function getLabelForStringCondition(condition: StringFormatCondition): string {
   }
 }
 
+function getTextForNumberCondition(condition: NumberFormatCondition): string {
+  switch (condition) {
+    case NumberFormatCondition.IS_EQUAL:
+      return '==';
+    case NumberFormatCondition.IS_NOT_EQUAL:
+      return '!=';
+    case NumberFormatCondition.IS_BETWEEN:
+      return '==';
+    case NumberFormatCondition.GREATER_THAN:
+      return '>';
+    case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
+      return '>=';
+    case NumberFormatCondition.LESS_THAN:
+      return '<';
+    case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+      return '<=';
+  }
+}
+
+function getTextForStringCondition(condition: StringFormatCondition): string {
+  switch (condition) {
+    case StringFormatCondition.IS_EXACTLY:
+      return '==';
+    case StringFormatCondition.IS_NOT_EXACTLY:
+      return '!=';
+    // case StringFormatCondition.CONTAINS:
+    //   return '==';
+    // case StringFormatCondition.DOES_NOT_CONTAIN:
+    //   return 'Does not contain';
+    // case StringFormatCondition.STARTS_WITH:
+    //   return 'Starts with';
+    // case StringFormatCondition.ENDS_WITH:
+    //   return 'Ends with';
+    default:
+      return '==';
+  }
+}
+
+export function getTextForConditionType(
+  columnType: string,
+  condition: StringFormatCondition | NumberFormatCondition
+): string {
+  if (TableUtils.isNumberType(columnType)) {
+    return getTextForNumberCondition(condition as NumberFormatCondition);
+  }
+  return getTextForStringCondition(condition as StringFormatCondition);
+}
+
 function getLabelForStyleType(option: FormatStyleType): string {
   switch (option) {
     case FormatStyleType.NO_FORMATTING:
@@ -211,6 +255,29 @@ function getLabelForStyleType(option: FormatStyleType): string {
       return 'Accent 2';
     case FormatStyleType.CUSTOM:
       return 'Custom...';
+  }
+}
+
+export function getColorForStyleType(option: FormatStyleType): string {
+  switch (option) {
+    case FormatStyleType.NO_FORMATTING:
+      return 'null';
+    case FormatStyleType.POSITIVE:
+      return 'GREEN';
+    case FormatStyleType.NEGATIVE:
+      return 'RED';
+    case FormatStyleType.WARN:
+      return 'ORANGE';
+    case FormatStyleType.NEUTRAL:
+      return 'YELLOW';
+    case FormatStyleType.ACCENT_1:
+      return 'BLUE';
+    case FormatStyleType.ACCENT_2:
+      return 'PURPLE';
+    case FormatStyleType.CUSTOM:
+      return 'null';
+    default:
+      return 'null';
   }
 }
 
@@ -309,7 +376,7 @@ const ConditionalFormattingEditor = (
     columns.length > 0 ? columns[0] : undefined
   );
 
-  const [selectedFormatter, setFormatter] = useState('conditional');
+  const [selectedFormatter, setFormatter] = useState(FormatterType.CONDITIONAL);
 
   // TODO: init?
   const [conditionValue, setConditionValue] = useState();
@@ -331,14 +398,28 @@ const ConditionalFormattingEditor = (
     }
   }, [selectedColumnType]);
 
-  const [selectedCondition, setCondition] = useState('is-equal');
+  // TODO: test on different columns
+  const [selectedCondition, setCondition] = useState(
+    TableUtils.isNumberType(selectedColumnType)
+      ? NumberFormatCondition.IS_EQUAL
+      : StringFormatCondition.IS_EXACTLY
+  );
 
   const handleColumnChange = useCallback(
     e => {
       const { value } = e.target;
-      setColumn(columns.find(({ name }) => name === value));
+      const newColumn = columns.find(({ name }) => name === value);
+      if (newColumn && selectedColumnType !== newColumn.type) {
+        log.debug('handleColumnChange', selectedColumnType, newColumn.type);
+        setCondition(
+          TableUtils.isNumberType(newColumn.type)
+            ? NumberFormatCondition.IS_EQUAL
+            : StringFormatCondition.IS_EXACTLY
+        );
+      }
+      setColumn(newColumn);
     },
-    [columns]
+    [columns, selectedColumnType]
   );
 
   const handleCancel = useCallback(() => {
@@ -373,11 +454,26 @@ const ConditionalFormattingEditor = (
       );
       return;
     }
-    const rule = `${
-      selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
-    } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
+    // const rule = `${
+    //   selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
+    // } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
     // TODO: build config based on formatter type, conditions, values, style, etc
-    onApply(rule, selectedStyle, id);
+    onApply(
+      {
+        type: selectedFormatter,
+        column: selectedColumn,
+        config: {
+          condition: selectedCondition,
+          style: {
+            type: selectedStyle,
+            // TODO
+            customConfig: undefined,
+          },
+          value: conditionValue,
+        },
+      },
+      id
+    );
   }, [
     onApply,
     selectedColumn,
@@ -415,6 +511,7 @@ const ConditionalFormattingEditor = (
   }, []);
 
   const conditionInputs = useMemo(() => {
+    log.debug('conditionInputs useMemo', selectedColumnType, selectedCondition);
     if (TableUtils.isNumberType(selectedColumnType)) {
       switch (selectedCondition) {
         case NumberFormatCondition.IS_EQUAL:
@@ -428,7 +525,7 @@ const ConditionalFormattingEditor = (
               type="text"
               className="form-control"
               placeholder="Enter value"
-              value={conditionValue}
+              value={conditionValue ?? ''}
               onChange={handleValueChange}
             />
           );
@@ -439,7 +536,7 @@ const ConditionalFormattingEditor = (
                 type="text"
                 className="form-control d-flex mr-2"
                 placeholder="Start value"
-                value={conditionValue}
+                value={conditionValue ?? ''}
                 onChange={handleValueChange}
               />
               <input
@@ -448,7 +545,7 @@ const ConditionalFormattingEditor = (
                 type="text"
                 className="form-control d-flex"
                 placeholder="End value"
-                value={conditionValue}
+                value={conditionValue ?? ''}
                 onChange={handleValueChange}
               />
             </div>
@@ -460,7 +557,7 @@ const ConditionalFormattingEditor = (
           type="text"
           className="form-control"
           placeholder="Enter value"
-          value={conditionValue}
+          value={conditionValue ?? ''}
           onChange={handleValueChange}
         />
       );
@@ -599,7 +696,7 @@ const ConditionalFormattingEditor = (
                     type="text"
                     className="form-control"
                     placeholder="Start value"
-                    value={conditionValue}
+                    value={conditionValue ?? ''}
                     onChange={handleValueChange}
                   />
                 </div>
@@ -617,7 +714,7 @@ const ConditionalFormattingEditor = (
                   type="text"
                   className="form-control d-flex"
                   placeholder="End value"
-                  value={conditionValue}
+                  value={conditionValue ?? ''}
                   onChange={handleValueChange}
                 />
               </div>

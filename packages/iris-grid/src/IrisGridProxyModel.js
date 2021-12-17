@@ -342,6 +342,14 @@ class IrisGridProxyModel extends IrisGridModel {
     this.model.customColumns = customColumns;
   }
 
+  get formatColumns() {
+    return this.model.formatColumns;
+  }
+
+  set formatColumns(formatColumns) {
+    this.model.formatColumns = formatColumns;
+  }
+
   get rollupConfig() {
     return this.rollup;
   }

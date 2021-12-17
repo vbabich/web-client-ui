@@ -186,6 +186,15 @@ class IrisGridModel extends GridModel {
     throw new Error('set customColumns not implemented');
   }
 
+  // TODO: jsdoc
+  get formatColumns() {
+    throw new Error('get formatColumns not implemented');
+  }
+
+  set formatColumns(formatColumns) {
+    throw new Error('set formatColumns not implemented');
+  }
+
   /**
    * @returns {dh.RollupTableConfig} The config to use for rolling up this table
    */
