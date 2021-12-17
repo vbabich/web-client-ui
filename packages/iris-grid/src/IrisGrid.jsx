@@ -653,32 +653,40 @@ export class IrisGrid extends Component {
 
   getFormatColumns = memoize((columns, config) => {
     log.debug('getFormatColumns', columns, config);
-    return config
-      .map(({ config: formatConfig, column }) => {
-        // TODO: do we need to check both name and type?
-        // see if this conflicts with renamed custom columns etc
-        const col = columns.find(
-          ({ name, type }) => name === column.name && type === column.type
+    const result = [];
+    const formatColumnMap = new Map();
+    config.forEach(({ config: formatConfig, column }) => {
+      // Check both name and type because the type can change
+      const col = columns.find(
+        ({ name, type }) => name === column.name && type === column.type
+      );
+      if (!col) {
+        log.debug(
+          `Column ${column.name}:${column.type} not found. Ignoring format rule`,
+          formatConfig
         );
-        if (!col) {
-          return null;
-        }
-        const value = TableUtils.isNumberType(col.type)
-          ? formatConfig.value
-          : `"${formatConfig.value}"`;
+        return;
+      }
+      const value = TableUtils.isNumberType(col.type)
+        ? formatConfig.value
+        : `"${formatConfig.value}"`;
+      const { rule: prevRule = null, index = undefined } =
+        formatColumnMap.get(col.name) ?? {};
+      const rule = `${col.name} ${getTextForConditionType(
+        col.type,
+        formatConfig.condition
+      )} ${value} ?  bgfga(${getColorForStyleType(
+        formatConfig.style.type
+      )}) : ${prevRule}`;
+      const formatColumn = col.formatColor(rule);
+      if (index !== undefined) {
+        result.splice(index, 1);
+      }
+      result.push(formatColumn);
+      formatColumnMap.set(col.name, { rule, index: result.length - 1 });
+    });
 
-        const combinedColumnRule = null;
-
-        return col.formatColor(
-          `${col.name} ${getTextForConditionType(
-            col.type,
-            formatConfig.condition
-          )} ${value} ?  bgfga(${getColorForStyleType(
-            formatConfig.style.type
-          )}) : ${combinedColumnRule}`
-        );
-      })
-      .filter(formatColumn => formatColumn !== null);
+    return result;
   });
 
   getModelRollupConfig = memoize(
