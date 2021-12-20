@@ -3086,7 +3086,7 @@ IrisGrid.propTypes = {
   alwaysFetchColumns: PropTypes.arrayOf(PropTypes.string),
   isFilterBarShown: PropTypes.bool,
   applyInputFiltersOnInit: PropTypes.bool,
-  conditionalFormats: PropTypes.arrayOf(PropTypes.string),
+  conditionalFormats: PropTypes.arrayOf(PropTypes.shape({})),
   customColumnFormatMap: PropTypes.instanceOf(Map),
   movedColumns: PropTypes.arrayOf(
     PropTypes.shape({

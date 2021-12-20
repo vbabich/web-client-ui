@@ -233,6 +233,7 @@ export class IrisGridPanel extends PureComponent {
       isFilterBarShown,
       quickFilters,
       customColumns,
+      conditionalFormats,
       reverseType,
       rollupConfig,
       showSearchBar,
@@ -258,6 +259,7 @@ export class IrisGridPanel extends PureComponent {
         },
         quickFilters,
         customColumns,
+        conditionalFormats,
         reverseType,
         rollupConfig,
         showSearchBar,
@@ -682,6 +684,7 @@ export class IrisGridPanel extends PureComponent {
         advancedSettings,
         customColumns,
         customColumnFormatMap,
+        conditionalFormats,
         isFilterBarShown,
         quickFilters,
         reverseType,
@@ -705,6 +708,7 @@ export class IrisGridPanel extends PureComponent {
       this.setState({
         advancedFilters,
         advancedSettings,
+        conditionalFormats,
         customColumns,
         customColumnFormatMap,
         isFilterBarShown,
@@ -750,6 +754,7 @@ export class IrisGridPanel extends PureComponent {
       isFilterBarShown,
       quickFilters,
       customColumns,
+      conditionalFormats,
       reverseType,
       rollupConfig,
       showSearchBar,
@@ -779,6 +784,7 @@ export class IrisGridPanel extends PureComponent {
         isFilterBarShown,
         quickFilters,
         customColumns,
+        conditionalFormats,
         reverseType,
         rollupConfig,
         showSearchBar,
@@ -831,6 +837,7 @@ export class IrisGridPanel extends PureComponent {
       advancedFilters,
       aggregationSettings,
       advancedSettings,
+      conditionalFormats,
       customColumns,
       customColumnFormatMap,
       error,
@@ -904,6 +911,7 @@ export class IrisGridPanel extends PureComponent {
             customColumns={customColumns}
             customColumnFormatMap={customColumnFormatMap}
             columnSelectionValidator={this.isColumnSelectionValid}
+            conditionalFormats={conditionalFormats}
             inputFilters={this.getGridInputFilters(model.columns, inputFilters)}
             applyInputFiltersOnInit={panelState == null}
             isFilterBarShown={isFilterBarShown}

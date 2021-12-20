@@ -118,6 +118,7 @@ const ConditionalFormattingMenu = (
       <ConditionalFormattingEditor
         columns={columns}
         id={selectedRuleId}
+        rule={selectedRuleId !== undefined ? rules[selectedRuleId] : undefined}
         onCancel={handleCancel}
         onApply={handleApply}
         disableCancel={rules.length === 0}

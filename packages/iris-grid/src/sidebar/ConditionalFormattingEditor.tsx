@@ -311,6 +311,32 @@ function getFormatterTypeLabel(option: FormatterType): string {
   }
 }
 
+function getDefaultConditionForType(
+  columnType: string | undefined
+): NumberFormatCondition | StringFormatCondition {
+  // TODO: other types
+  return TableUtils.isNumberType(columnType)
+    ? NumberFormatCondition.IS_EQUAL
+    : StringFormatCondition.IS_EXACTLY;
+}
+
+function makeDefaultRule(columns: ModelColumn[]): FormattingRule {
+  const { type, name } = columns[0];
+  const column = { type, name };
+  const condition = getDefaultConditionForType(type);
+  return {
+    type: FormatterType.CONDITIONAL,
+    column,
+    config: {
+      condition,
+      value: undefined,
+      style: {
+        type: FormatStyleType.NO_FORMATTING,
+      },
+    },
+  };
+}
+
 const numberFormatConditionOptions = [
   NumberFormatCondition.IS_EQUAL,
   NumberFormatCondition.IS_NOT_EQUAL,
@@ -369,18 +395,36 @@ const ConditionalFormattingEditor = (
     onApply = DEFAULT_CALLBACK,
     onCancel = DEFAULT_CALLBACK,
     id,
+    rule = undefined,
     disableCancel = false,
   } = props;
 
-  const [selectedColumn, setColumn] = useState(() =>
-    columns.length > 0 ? columns[0] : undefined
+  // TODO
+  const { column: defaultColumn, type: defaultType, config } =
+    rule ?? makeDefaultRule(columns);
+
+  const [selectedColumn, setColumn] = useState(
+    columns.length > 0
+      ? columns.find(
+          c => c.name === defaultColumn.name && c.type === defaultColumn.type
+        )
+      : undefined
   );
 
-  const [selectedFormatter, setFormatter] = useState(FormatterType.CONDITIONAL);
+  const [selectedFormatter, setFormatter] = useState(defaultType);
 
   // TODO: init?
-  const [conditionValue, setConditionValue] = useState();
-  const [selectedStyle, setStyle] = useState(FormatStyleType.NO_FORMATTING);
+  const [conditionValue, setConditionValue] = useState(
+    defaultType === FormatterType.CONDITIONAL
+      ? (config as ConditionConfig).value
+      : undefined
+  );
+  // TODO: style only needed for some of the conditional format types
+  const [selectedStyle, setStyle] = useState(
+    defaultType === FormatterType.CONDITIONAL
+      ? (config as ConditionConfig).style.type
+      : undefined
+  );
 
   const selectedColumnType = selectedColumn?.type;
 
@@ -400,9 +444,18 @@ const ConditionalFormattingEditor = (
 
   // TODO: test on different columns
   const [selectedCondition, setCondition] = useState(
-    TableUtils.isNumberType(selectedColumnType)
-      ? NumberFormatCondition.IS_EQUAL
-      : StringFormatCondition.IS_EXACTLY
+    defaultType === FormatterType.CONDITIONAL
+      ? (config as ConditionConfig).condition
+      : undefined
+  );
+
+  log.debug(
+    'loop',
+    selectedColumnType,
+    rule,
+    defaultType,
+    defaultColumn,
+    config
   );
 
   const handleColumnChange = useCallback(
@@ -438,6 +491,14 @@ const ConditionalFormattingEditor = (
       return;
     }
 
+    if (selectedCondition === undefined) {
+      log.error('Unable to create formatting rule. Condition is not selected.');
+      return;
+    }
+
+    const { type, name } = selectedColumn;
+    const column = { type, name };
+
     log.debug(
       'TEST',
       TableUtils.isNumberType(selectedColumn.type),
@@ -461,7 +522,7 @@ const ConditionalFormattingEditor = (
     onApply(
       {
         type: selectedFormatter,
-        column: selectedColumn,
+        column,
         config: {
           condition: selectedCondition,
           style: {
@@ -583,18 +644,18 @@ const ConditionalFormattingEditor = (
         </label>
 
         <div className="form-row">
-          {formatterTypes.map((formatterType, index) => (
-            <div key={formatterType} className="col col-formatter-type">
+          {formatterTypes.map((type, index) => (
+            <div key={type} className="col col-formatter-type">
               <button
                 type="button"
                 className={classNames('btn', 'btn-icon', 'btn-formatter-type', {
-                  active: formatterType === selectedFormatter,
+                  active: type === selectedFormatter,
                 })}
                 data-index={index}
-                onClick={() => handleFormatterChange(formatterType)}
+                onClick={() => handleFormatterChange(type)}
               >
-                {getFormatterTypeIcon(formatterType)}
-                {getFormatterTypeLabel(formatterType)}
+                {getFormatterTypeIcon(type)}
+                {getFormatterTypeLabel(type)}
               </button>
             </div>
           ))}
