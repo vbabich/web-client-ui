@@ -6,13 +6,13 @@ import { dhNewCircleLargeFilled, vsGripper, vsTrash } from '@deephaven/icons';
 import { Button, DragUtils, Tooltip } from '@deephaven/components';
 import Log from '@deephaven/log';
 import ConditionalFormattingEditor, {
-  ConditionConfig,
   FormatterType,
   FormattingRule,
   getTextForConditionType,
 } from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
+import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
 
 const log = Log.module('ConditionalFormattingMenu');
 
@@ -118,7 +118,11 @@ const ConditionalFormattingMenu = (
       <ConditionalFormattingEditor
         columns={columns}
         id={selectedRuleId}
-        rule={selectedRuleId !== undefined ? rules[selectedRuleId] : undefined}
+        rule={
+          selectedRuleId !== undefined
+            ? rules[(selectedRuleId as unknown) as number]
+            : undefined
+        }
         onCancel={handleCancel}
         onApply={handleApply}
         disableCancel={rules.length === 0}
@@ -168,10 +172,11 @@ const ConditionalFormattingMenu = (
                         <div className="conditional-formatting-list-item">
                           <div className="formatting-item">
                             <div className="rule-title">
-                              {rule.column.name}{' '}
+                              {(rule.config as ConditionConfig).column.name}{' '}
                               {rule.type === FormatterType.CONDITIONAL
                                 ? `${getTextForConditionType(
-                                    rule.column.type,
+                                    (rule.config as ConditionConfig).column
+                                      .type,
                                     (rule.config as ConditionConfig).condition
                                   )} `
                                 : null}

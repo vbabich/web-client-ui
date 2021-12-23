@@ -88,10 +88,8 @@ import AdvancedSettingsMenu from './sidebar/AdvancedSettingsMenu';
 import SHORTCUTS from './IrisGridShortcuts';
 import DateUtils from './DateUtils';
 import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
-import {
-  getColorForStyleType,
-  getTextForConditionType,
-} from './sidebar/ConditionalFormattingEditor';
+import { getTextForConditionType } from './sidebar/ConditionalFormattingEditor';
+import { getColorForStyleType } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
 
 const log = Log.module('IrisGrid');
 
@@ -651,11 +649,13 @@ export class IrisGrid extends Component {
       .filter(o => !AggregationUtils.isRollupOperation(o))
   );
 
-  getFormatColumns = memoize((columns, config) => {
-    log.debug('getFormatColumns', columns, config);
+  getFormatColumns = memoize((columns, rules) => {
+    log.debug('getFormatColumns', columns, rules);
     const result = [];
     const formatColumnMap = new Map();
-    config.forEach(({ config: formatConfig, column }) => {
+    rules.forEach(({ config }) => {
+      // TODO: depends on formatter type, ROWS might have no columns property
+      const { column } = config;
       // Check both name and type because the type can change
       const col = columns.find(
         ({ name, type }) => name === column.name && type === column.type
@@ -663,20 +663,20 @@ export class IrisGrid extends Component {
       if (!col) {
         log.debug(
           `Column ${column.name}:${column.type} not found. Ignoring format rule`,
-          formatConfig
+          config
         );
         return;
       }
       const value = TableUtils.isNumberType(col.type)
-        ? formatConfig.value
-        : `"${formatConfig.value}"`;
+        ? config.value
+        : `"${config.value}"`;
       const { rule: prevRule = null, index = undefined } =
         formatColumnMap.get(col.name) ?? {};
       const rule = `${col.name} ${getTextForConditionType(
         col.type,
-        formatConfig.condition
+        config.condition
       )} ${value} ?  bgfga(${getColorForStyleType(
-        formatConfig.style.type
+        config.style.type
       )}) : ${prevRule}`;
       const formatColumn = col.formatColor(rule);
       if (index !== undefined) {

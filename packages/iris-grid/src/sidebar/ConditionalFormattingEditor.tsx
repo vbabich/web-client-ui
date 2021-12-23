@@ -11,6 +11,14 @@ import {
 import { TableUtils } from '..';
 
 import './ConditionalFormattingEditor.scss';
+import ConditionalRuleEditor, {
+  NumberFormatCondition,
+  StringFormatCondition,
+  FormatPointType,
+  FormatStyleType,
+  ConditionConfig,
+} from './conditional-formatting/ConditionalRuleEditor';
+import { getLabelForStyleType } from './conditional-formatting/ConditionalFormattingUtils';
 
 const log = Log.module('ConditionalFormattingEditor');
 
@@ -20,6 +28,10 @@ export type ConditionalFormattingApplyCallback = (
 ) => void;
 
 export type ConditionalFormattingCancelCallback = () => void;
+
+export type FormattingRuleEditorChangeCallback = (
+  ruleConfig: ConditionConfig
+) => void;
 
 export interface ModelColumn {
   name: string;
@@ -32,43 +44,6 @@ export enum FormatterType {
   PROGRESS = 'progress',
   HEATMAP = 'heatmap',
   ROWS = 'rows',
-}
-
-export enum NumberFormatCondition {
-  IS_EQUAL = 'is-equal',
-  IS_NOT_EQUAL = 'is-not-equal',
-  IS_BETWEEN = 'is-between',
-  GREATER_THAN = 'greater-than',
-  GREATER_THAN_OR_EQUAL = 'greater-than-or-equal',
-  LESS_THAN = 'less-than',
-  LESS_THAN_OR_EQUAL = 'less-than-or-equal',
-}
-
-export enum StringFormatCondition {
-  IS_EXACTLY = 'is-exactly',
-  IS_NOT_EXACTLY = 'is-not-exactly',
-  CONTAINS = 'contains',
-  DOES_NOT_CONTAIN = 'does-not-contain',
-  STARTS_WITH = 'starts-with',
-  ENDS_WITH = 'ends-with',
-}
-
-export enum FormatStyleType {
-  NO_FORMATTING = 'no-formatting',
-  POSITIVE = 'positive',
-  NEGATIVE = 'negative',
-  WARN = 'warn',
-  NEUTRAL = 'neutral',
-  ACCENT_1 = 'accent-1',
-  ACCENT_2 = 'accent-2',
-  CUSTOM = 'custom',
-}
-
-export enum FormatPointType {
-  AUTO = 'auto',
-  NUMBER = 'number',
-  MIN_VALUE = 'min-value',
-  MAX_VALUE = 'max-value',
 }
 
 export enum ColorScaleType {
@@ -90,21 +65,14 @@ export interface FormatStyleConfig {
     background: string;
   };
 }
-
-export interface ConditionConfig {
-  condition: NumberFormatCondition | StringFormatCondition;
-  value?: string | number;
-  start?: number;
-  end?: number;
-  style: FormatStyleConfig;
-}
-
 export interface AdvancedConditionConfig {
+  column: ModelColumn;
   condition: string;
   style: FormatStyleConfig;
 }
 
 export interface ProgressConfig {
+  column: ModelColumn;
   style: FormatStyleConfig;
   startType: FormatPointType;
   endType: FormatPointType;
@@ -114,6 +82,7 @@ export interface ProgressConfig {
 }
 
 export interface ColorScaleConfig {
+  column: ModelColumn;
   // TODO: heatmap on non-number columns?
   // TODO: only show numeric columns in the selector?
   scale: ColorScaleType;
@@ -130,9 +99,14 @@ export interface ColorScaleConfig {
 // Same fields as in ConditionConfig for now
 export type RowsConfig = ConditionConfig;
 
-export interface FormattingRule {
+export interface ConditionalFormattingRule {
   type: FormatterType;
   column: ModelColumn;
+  config: ConditionConfig;
+}
+
+export interface FormattingRule {
+  type: FormatterType;
   config:
     | ConditionConfig
     | AdvancedConditionConfig
@@ -237,50 +211,6 @@ export function getTextForConditionType(
   return getTextForStringCondition(condition as StringFormatCondition);
 }
 
-function getLabelForStyleType(option: FormatStyleType): string {
-  switch (option) {
-    case FormatStyleType.NO_FORMATTING:
-      return 'No formatting';
-    case FormatStyleType.POSITIVE:
-      return 'Positive';
-    case FormatStyleType.NEGATIVE:
-      return 'Negative';
-    case FormatStyleType.WARN:
-      return 'Warn';
-    case FormatStyleType.NEUTRAL:
-      return 'Neutral';
-    case FormatStyleType.ACCENT_1:
-      return 'Accent 1';
-    case FormatStyleType.ACCENT_2:
-      return 'Accent 2';
-    case FormatStyleType.CUSTOM:
-      return 'Custom...';
-  }
-}
-
-export function getColorForStyleType(option: FormatStyleType): string {
-  switch (option) {
-    case FormatStyleType.NO_FORMATTING:
-      return 'null';
-    case FormatStyleType.POSITIVE:
-      return 'GREEN';
-    case FormatStyleType.NEGATIVE:
-      return 'RED';
-    case FormatStyleType.WARN:
-      return 'ORANGE';
-    case FormatStyleType.NEUTRAL:
-      return 'YELLOW';
-    case FormatStyleType.ACCENT_1:
-      return 'BLUE';
-    case FormatStyleType.ACCENT_2:
-      return 'PURPLE';
-    case FormatStyleType.CUSTOM:
-      return 'null';
-    default:
-      return 'null';
-  }
-}
-
 function getFormatterTypeIcon(option: FormatterType): JSX.Element | undefined {
   switch (option) {
     case FormatterType.CONDITIONAL:
@@ -326,8 +256,8 @@ function makeDefaultRule(columns: ModelColumn[]): FormattingRule {
   const condition = getDefaultConditionForType(type);
   return {
     type: FormatterType.CONDITIONAL,
-    column,
     config: {
+      column,
       condition,
       value: undefined,
       style: {
@@ -395,13 +325,13 @@ const ConditionalFormattingEditor = (
     onApply = DEFAULT_CALLBACK,
     onCancel = DEFAULT_CALLBACK,
     id,
-    rule = undefined,
+    rule: defaultRule = undefined,
     disableCancel = false,
   } = props;
 
   // TODO
-  const { column: defaultColumn, type: defaultType, config } =
-    rule ?? makeDefaultRule(columns);
+  const { type: defaultType, config } = defaultRule ?? makeDefaultRule(columns);
+  const { column: defaultColumn } = config;
 
   const [selectedColumn, setColumn] = useState(
     columns.length > 0
@@ -412,6 +342,8 @@ const ConditionalFormattingEditor = (
   );
 
   const [selectedFormatter, setFormatter] = useState(defaultType);
+
+  const [rule, setRule] = useState(defaultRule);
 
   // TODO: init?
   const [conditionValue, setConditionValue] = useState(
@@ -481,69 +413,69 @@ const ConditionalFormattingEditor = (
 
   const handleApply = useCallback(() => {
     // TODO: validation
-    if (selectedColumn === undefined) {
-      log.error('Unable to create formatting rule. Column is not selected.');
+
+    if (rule === undefined) {
+      log.error('Unable to apply formatting. Rule is not defined.');
       return;
     }
 
-    if (selectedStyle === undefined) {
-      log.error('Unable to create formatting rule. Style is not selected.');
-      return;
-    }
+    // if (selectedColumn === undefined) {
+    //   log.error('Unable to create formatting rule. Column is not selected.');
+    //   return;
+    // }
 
-    if (selectedCondition === undefined) {
-      log.error('Unable to create formatting rule. Condition is not selected.');
-      return;
-    }
+    // if (selectedStyle === undefined) {
+    //   log.error('Unable to create formatting rule. Style is not selected.');
+    //   return;
+    // }
 
-    const { type, name } = selectedColumn;
-    const column = { type, name };
+    // if (selectedCondition === undefined) {
+    //   log.error('Unable to create formatting rule. Condition is not selected.');
+    //   return;
+    // }
 
-    log.debug(
-      'TEST',
-      TableUtils.isNumberType(selectedColumn.type),
-      Number.isNaN(Number(conditionValue))
-    );
+    // const { type, name } = selectedColumn;
+    // const column = { type, name };
 
-    if (
-      TableUtils.isNumberType(selectedColumn.type) &&
-      Number.isNaN(Number(conditionValue))
-    ) {
-      log.error(
-        'Unable to create formatting rule. Invalid value',
-        conditionValue
-      );
-      return;
-    }
+    // log.debug(
+    //   'TEST',
+    //   TableUtils.isNumberType(selectedColumn.type),
+    //   Number.isNaN(Number(conditionValue))
+    // );
+
+    // if (
+    //   TableUtils.isNumberType(selectedColumn.type) &&
+    //   Number.isNaN(Number(conditionValue))
+    // ) {
+    //   log.error(
+    //     'Unable to create formatting rule. Invalid value',
+    //     conditionValue
+    //   );
+    //   return;
+    // }
     // const rule = `${
     //   selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
     // } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
     // TODO: build config based on formatter type, conditions, values, style, etc
-    onApply(
-      {
-        type: selectedFormatter,
-        column,
-        config: {
-          condition: selectedCondition,
-          style: {
-            type: selectedStyle,
-            // TODO
-            customConfig: undefined,
-          },
-          value: conditionValue,
-        },
-      },
-      id
-    );
-  }, [
-    onApply,
-    selectedColumn,
-    selectedCondition,
-    selectedFormatter,
-    selectedStyle,
-    conditionValue,
-    id,
-  ]);
+    // onApply(
+    //   {
+    //     type: selectedFormatter,
+    //     config: {
+    //       column,
+    //       condition: selectedCondition,
+    //       style: {
+    //         type: selectedStyle,
+    //         // TODO
+    //         customConfig: undefined,
+    //       },
+    //       value: conditionValue,
+    //     },
+    //   },
+    //   id
+    // );
+
+    onApply(rule, id);
+  }, [onApply, rule, id]);
 
   const handleFormatterChange = useCallback(value => {
     log.debug('handleFormatterChange', value);
@@ -570,6 +502,21 @@ const ConditionalFormattingEditor = (
     log.debug('handleStyleChange', value);
     setStyle(value);
   }, []);
+
+  const handleRuleChange = useCallback(
+    ruleConfig => {
+      log.debug('handleRuleChange', ruleConfig, selectedFormatter);
+      if (selectedFormatter === undefined) {
+        log.debug('Unable to create new rule - formatter not selected.');
+        return;
+      }
+      setRule({
+        type: selectedFormatter,
+        config: ruleConfig as ConditionConfig,
+      });
+    },
+    [selectedFormatter]
+  );
 
   const conditionInputs = useMemo(() => {
     log.debug('conditionInputs useMemo', selectedColumnType, selectedCondition);
@@ -662,25 +609,34 @@ const ConditionalFormattingEditor = (
         </div>
       </div>
 
-      <div className="mb-2">
-        <label className="mb-0" htmlFor="column-select">
-          {selectedFormatter === FormatterType.ROWS
-            ? 'Format Row If'
-            : 'Apply to Column'}
-        </label>
-        <select
-          value={selectedColumn?.name}
-          className="custom-select"
-          id="column-select"
-          onChange={handleColumnChange}
-        >
-          {columnOptions}
-        </select>
-      </div>
+      {selectedFormatter === FormatterType.CONDITIONAL && (
+        <ConditionalRuleEditor
+          columns={columns}
+          config={rule?.config as ConditionConfig}
+          onChange={handleRuleChange}
+        />
+      )}
 
-      {(selectedFormatter === FormatterType.CONDITIONAL ||
+      {selectedFormatter !== FormatterType.CONDITIONAL && (
+        <div className="mb-2">
+          <label className="mb-0" htmlFor="column-select">
+            {selectedFormatter === FormatterType.ROWS
+              ? 'Format Row If'
+              : 'Apply to Column'}
+          </label>
+          <select
+            value={selectedColumn?.name}
+            className="custom-select"
+            id="column-select"
+            onChange={handleColumnChange}
+          >
+            {columnOptions}
+          </select>
+        </div>
+      )}
+
+      {(selectedFormatter === FormatterType.ADVANCED ||
         // TODO
-        selectedFormatter === FormatterType.ADVANCED ||
         selectedFormatter === FormatterType.ROWS) &&
         selectedColumn !== undefined && (
           <>
