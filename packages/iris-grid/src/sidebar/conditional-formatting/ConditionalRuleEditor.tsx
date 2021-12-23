@@ -200,6 +200,10 @@ const ConditionalRuleEditor = (
     (config as ConditionConfig).style.type
   );
 
+  const [selectedColor, setColor] = useState(
+    (config as ConditionConfig).style.customConfig?.background ?? '#fcfcfa'
+  );
+
   const selectedColumnType = selectedColumn?.type;
 
   const conditions = useMemo(() => {
@@ -327,6 +331,12 @@ const ConditionalRuleEditor = (
     setStyle(value);
   }, []);
 
+  const handleColorChange = useCallback(e => {
+    const { value } = e.target;
+    log.debug('handleColorChange', value);
+    setColor(value);
+  }, []);
+
   useEffect(() => {
     // TODO: validation;
     if (selectedColumn === undefined) {
@@ -370,12 +380,16 @@ const ConditionalRuleEditor = (
       style: {
         type: selectedStyle,
         // TODO
-        customConfig: undefined,
+        customConfig: {
+          foreground: '',
+          background: selectedColor,
+        },
       },
       value: conditionValue,
     });
   }, [
     onChange,
+    selectedColor,
     selectedColumn,
     selectedStyle,
     selectedCondition,
@@ -494,6 +508,21 @@ const ConditionalRuleEditor = (
               {styleOptions}
             </select>
           </div>
+
+          {selectedStyle === FormatStyleType.CUSTOM && (
+            <div className="mb-2">
+              <label className="mb-0" htmlFor="color-select">
+                Color
+              </label>
+              <input
+                type="color"
+                value={selectedColor}
+                className="custom-select"
+                id="color-select"
+                onChange={handleColorChange}
+              />
+            </div>
+          )}
         </>
       )}
     </div>

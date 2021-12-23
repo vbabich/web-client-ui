@@ -13,6 +13,7 @@ import ConditionalFormattingEditor, {
 
 import './ConditionalFormattingMenu.scss';
 import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
+import { getColorForStyleType } from './conditional-formatting/ConditionalFormattingUtils';
 
 const log = Log.module('ConditionalFormattingMenu');
 
@@ -171,6 +172,24 @@ const ConditionalFormattingMenu = (
                       >
                         <div className="conditional-formatting-list-item">
                           <div className="formatting-item">
+                            <div className="rule-icon">
+                              <span
+                                style={{
+                                  width: '1em',
+                                  height: '1em',
+                                  display: 'flex',
+                                  borderWidth: 1,
+                                  borderColor: 'black',
+                                  backgroundColor:
+                                    getColorForStyleType(
+                                      (rule.config as ConditionConfig).style
+                                        ?.type,
+                                      (rule.config as ConditionConfig).style
+                                        ?.customConfig
+                                    ) ?? 'transparent',
+                                }}
+                              />
+                            </div>
                             <div className="rule-title">
                               {(rule.config as ConditionConfig).column.name}{' '}
                               {rule.type === FormatterType.CONDITIONAL

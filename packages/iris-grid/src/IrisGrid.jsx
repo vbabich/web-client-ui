@@ -675,9 +675,10 @@ export class IrisGrid extends Component {
       const rule = `${col.name} ${getTextForConditionType(
         col.type,
         config.condition
-      )} ${value} ?  bgfga(${getColorForStyleType(
-        config.style.type
-      )}) : ${prevRule}`;
+      )} ${value} ?  bgfga(\`${getColorForStyleType(
+        config?.style?.type,
+        config?.style?.customConfig
+      )}\`) : ${prevRule}`;
       const formatColumn = col.formatColor(rule);
       if (index !== undefined) {
         result.splice(index, 1);

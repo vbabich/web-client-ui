@@ -21,25 +21,30 @@ export function getLabelForStyleType(option: FormatStyleType): string {
   }
 }
 
-export function getColorForStyleType(option: FormatStyleType): string {
+// TODO: just accept the style object
+export function getColorForStyleType(
+  option: FormatStyleType,
+  customConfig?: any
+): string | null {
   switch (option) {
     case FormatStyleType.NO_FORMATTING:
-      return 'null';
+      return null;
     case FormatStyleType.POSITIVE:
-      return 'GREEN';
+      return '#9fde6f';
     case FormatStyleType.NEGATIVE:
-      return 'RED';
+      return '#ff6087';
     case FormatStyleType.WARN:
-      return 'ORANGE';
+      return '#f67f40';
     case FormatStyleType.NEUTRAL:
-      return 'YELLOW';
+      return '#ffd95c';
     case FormatStyleType.ACCENT_1:
-      return 'BLUE';
+      return '#78dce8';
     case FormatStyleType.ACCENT_2:
-      return 'PURPLE';
+      return '#ab9bf5';
     case FormatStyleType.CUSTOM:
-      return 'null';
+      // TODO: test with unset custom bg
+      return `${customConfig.background}`;
     default:
-      return 'null';
+      return null;
   }
 }

@@ -25,6 +25,11 @@
     transition: $btn-transition;
     border: $input-border-width solid transparent;
     line-height: $btn-line-height;
+
+    .rule-icon {
+      padding-right: $spacer-2;
+    }
+
     .rule-title {
       overflow-x: hidden;
       text-overflow: ellipsis;
