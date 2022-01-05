@@ -87,7 +87,9 @@ function getLabelForNumberCondition(condition: NumberFormatCondition): string {
   }
 }
 
-function getLabelForStringCondition(condition: StringFormatCondition): string {
+export function getLabelForStringCondition(
+  condition: StringFormatCondition
+): string {
   switch (condition) {
     case StringFormatCondition.IS_EXACTLY:
       return 'Is exactly';

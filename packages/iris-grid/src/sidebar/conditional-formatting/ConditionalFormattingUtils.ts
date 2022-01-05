@@ -1,4 +1,15 @@
-import { FormatStyleType } from './ConditionalRuleEditor';
+import { TableUtils } from '../..';
+import {
+  FormatStyleConfig,
+  getTextForNumberCondition,
+  getTextForStringCondition,
+} from '../ConditionalFormattingEditor';
+import {
+  ConditionConfig,
+  FormatStyleType,
+  NumberFormatCondition,
+  StringFormatCondition,
+} from './ConditionalRuleEditor';
 
 export function getLabelForStyleType(option: FormatStyleType): string {
   switch (option) {
@@ -21,12 +32,11 @@ export function getLabelForStyleType(option: FormatStyleType): string {
   }
 }
 
-// TODO: just accept the style object
-export function getColorForStyleType(
-  option: FormatStyleType,
-  customConfig?: any
+export function getColorForStyleConfig(
+  config: FormatStyleConfig
 ): string | null {
-  switch (option) {
+  const { type, customConfig } = config;
+  switch (type) {
     case FormatStyleType.NO_FORMATTING:
       return null;
     case FormatStyleType.POSITIVE:
@@ -43,8 +53,45 @@ export function getColorForStyleType(
       return '#ab9bf5';
     case FormatStyleType.CUSTOM:
       // TODO: test with unset custom bg
-      return `${customConfig.background}`;
+      return customConfig === undefined ? null : customConfig.background;
     default:
       return null;
   }
+}
+
+export function getTextForStyleConfig(
+  config: FormatStyleConfig
+): string | null {
+  return `bgfga(\`${getColorForStyleConfig(config)}\`)`;
+}
+
+function getNumberConditionText(config: ConditionConfig): string {
+  const { column, value } = config;
+  return getTextForNumberCondition(
+    column.name,
+    config.condition as NumberFormatCondition,
+    value
+  );
+}
+
+function getStringConditionText(config: ConditionConfig): string {
+  const { column, value } = config;
+  return getTextForStringCondition(
+    column.name,
+    config.condition as StringFormatCondition,
+    value
+  );
+}
+
+export function getConditionText(config: ConditionConfig): string {
+  const { column } = config;
+
+  if (TableUtils.isNumberType(column.type)) {
+    return getNumberConditionText(config);
+  }
+  if (TableUtils.isTextType(column.type)) {
+    return getStringConditionText(config);
+  }
+
+  throw new Error('Invalid condition config');
 }

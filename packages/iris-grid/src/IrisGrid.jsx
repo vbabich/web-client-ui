@@ -88,8 +88,11 @@ import AdvancedSettingsMenu from './sidebar/AdvancedSettingsMenu';
 import SHORTCUTS from './IrisGridShortcuts';
 import DateUtils from './DateUtils';
 import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
-import { getTextForConditionType } from './sidebar/ConditionalFormattingEditor';
-import { getColorForStyleType } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
+import {
+  getConditionText,
+  getTextForStyleConfig,
+} from './sidebar/conditional-formatting/ConditionalFormattingUtils';
+import ConditionalRuleEditor from './sidebar/conditional-formatting/ConditionalRuleEditor';
 
 const log = Log.module('IrisGrid');
 
@@ -667,18 +670,11 @@ export class IrisGrid extends Component {
         );
         return;
       }
-      const value = TableUtils.isNumberType(col.type)
-        ? config.value
-        : `"${config.value}"`;
       const { rule: prevRule = null, index = undefined } =
         formatColumnMap.get(col.name) ?? {};
-      const rule = `${col.name} ${getTextForConditionType(
-        col.type,
-        config.condition
-      )} ${value} ?  bgfga(\`${getColorForStyleType(
-        config?.style?.type,
-        config?.style?.customConfig
-      )}\`) : ${prevRule}`;
+      const rule = `${getConditionText(config)} ? ${getTextForStyleConfig(
+        config.style
+      )} : ${prevRule}`;
       const formatColumn = col.formatColor(rule);
       if (index !== undefined) {
         result.splice(index, 1);
@@ -1970,6 +1966,22 @@ export class IrisGrid extends Component {
     this.setState({ conditionalFormats });
   }
 
+  handleConditionalFormatChange(config) {
+    log.debug('handleConditionalFormatChange', config);
+    this.setState(state => {
+      if (config.id !== undefined) {
+        const conditionalFormats = [...state.conditionalFormats];
+        // const index = conditionalFormats.findIndex(({ id }) => id === config.id);
+        return { conditionalFormats, selectedConditionalFormat: undefined };
+      }
+
+      return {
+        conditionalFormats: [...state.conditionalFormats, config],
+        selectedConditionalFormat: undefined,
+      };
+    });
+  }
+
   handleUpdateCustomColumns(customColumns) {
     log.info(`handleUpdateCustomColumns:`, customColumns);
 
@@ -2788,6 +2800,14 @@ export class IrisGrid extends Component {
               columns={model.columns}
               rules={conditionalFormats}
               onChange={this.handleConditionalFormatsChange}
+            />
+          );
+        case OptionType.CONDITIONAL_FORMATTING_EDIT:
+          return (
+            <ConditionalRuleEditor
+              columns={model.columns}
+              config={selectedConditionalFormat}
+              onChange={this.handleConditionalRuleChange}
             />
           );
         case OptionType.CUSTOM_COLUMN_BUILDER:

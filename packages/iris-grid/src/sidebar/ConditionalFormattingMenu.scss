@@ -30,6 +30,12 @@
       padding-right: $spacer-2;
     }
 
+    .rule-icon-bg {
+      width: 1em;
+      height: 1em;
+      display: flex;
+    }
+
     .rule-title {
       overflow-x: hidden;
       text-overflow: ellipsis;

@@ -8,12 +8,13 @@ import Log from '@deephaven/log';
 import ConditionalFormattingEditor, {
   FormatterType,
   FormattingRule,
-  getTextForConditionType,
+  getLabelForConditionType,
 } from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
 import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
-import { getColorForStyleType } from './conditional-formatting/ConditionalFormattingUtils';
+import { getColorForStyleConfig } from './conditional-formatting/ConditionalFormattingUtils';
+import { TableUtils } from '..';
 
 const log = Log.module('ConditionalFormattingMenu');
 
@@ -32,6 +33,19 @@ export type ConditionalFormattingMenuProps = {
   selectedColumn?: string;
   onChange?: ConditionalFormattingMenuCallback;
 };
+
+function getRuleValue(config: ConditionConfig): string {
+  const {
+    column: { type },
+  } = config;
+  if (TableUtils.isNumberType(type)) {
+    return `${config.value}`;
+  }
+  if (TableUtils.isTextType(type)) {
+    return `"${config.value}"`;
+  }
+  throw new Error(`Invalid column type ${type} in getRuleValue`);
+}
 
 const ConditionalFormattingMenu = (
   props: ConditionalFormattingMenuProps
@@ -174,18 +188,11 @@ const ConditionalFormattingMenu = (
                           <div className="formatting-item">
                             <div className="rule-icon">
                               <span
+                                className="rule-icon-bg"
                                 style={{
-                                  width: '1em',
-                                  height: '1em',
-                                  display: 'flex',
-                                  borderWidth: 1,
-                                  borderColor: 'black',
                                   backgroundColor:
-                                    getColorForStyleType(
+                                    getColorForStyleConfig(
                                       (rule.config as ConditionConfig).style
-                                        ?.type,
-                                      (rule.config as ConditionConfig).style
-                                        ?.customConfig
                                     ) ?? 'transparent',
                                 }}
                               />
@@ -193,15 +200,13 @@ const ConditionalFormattingMenu = (
                             <div className="rule-title">
                               {(rule.config as ConditionConfig).column.name}{' '}
                               {rule.type === FormatterType.CONDITIONAL
-                                ? `${getTextForConditionType(
+                                ? `${getLabelForConditionType(
                                     (rule.config as ConditionConfig).column
                                       .type,
                                     (rule.config as ConditionConfig).condition
                                   )} `
                                 : null}
-                              {rule.type === FormatterType.CONDITIONAL
-                                ? (rule.config as ConditionConfig).value
-                                : null}
+                              {getRuleValue(rule.config as ConditionConfig)}
                             </div>
                             <button
                               type="button"

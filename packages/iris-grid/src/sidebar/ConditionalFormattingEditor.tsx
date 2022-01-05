@@ -17,6 +17,7 @@ import ConditionalRuleEditor, {
   FormatPointType,
   FormatStyleType,
   ConditionConfig,
+  getLabelForStringCondition,
 } from './conditional-formatting/ConditionalRuleEditor';
 import { getLabelForStyleType } from './conditional-formatting/ConditionalFormattingUtils';
 
@@ -146,24 +147,28 @@ function getLabelForNumberCondition(condition: NumberFormatCondition): string {
   }
 }
 
-function getLabelForStringCondition(condition: StringFormatCondition): string {
+function getShortLabelForStringCondition(
+  condition: StringFormatCondition
+): string {
   switch (condition) {
     case StringFormatCondition.IS_EXACTLY:
-      return 'Is exactly';
+      return '==';
     case StringFormatCondition.IS_NOT_EXACTLY:
-      return 'Is not exactly';
+      return '!=';
     case StringFormatCondition.CONTAINS:
-      return 'Contains';
+      return 'contains';
     case StringFormatCondition.DOES_NOT_CONTAIN:
-      return 'Does not contain';
+      return 'does not contain';
     case StringFormatCondition.STARTS_WITH:
-      return 'Starts with';
+      return 'starts with';
     case StringFormatCondition.ENDS_WITH:
-      return 'Ends with';
+      return 'ends with';
   }
 }
 
-function getTextForNumberCondition(condition: NumberFormatCondition): string {
+export function getShortLabelForNumberCondition(
+  condition: NumberFormatCondition
+): string {
   switch (condition) {
     case NumberFormatCondition.IS_EQUAL:
       return '==';
@@ -182,33 +187,58 @@ function getTextForNumberCondition(condition: NumberFormatCondition): string {
   }
 }
 
-function getTextForStringCondition(condition: StringFormatCondition): string {
+export function getTextForNumberCondition(
+  columnName: string,
+  condition: NumberFormatCondition,
+  value: unknown
+): string {
   switch (condition) {
-    case StringFormatCondition.IS_EXACTLY:
-      return '==';
-    case StringFormatCondition.IS_NOT_EXACTLY:
-      return '!=';
-    // case StringFormatCondition.CONTAINS:
-    //   return '==';
-    // case StringFormatCondition.DOES_NOT_CONTAIN:
-    //   return 'Does not contain';
-    // case StringFormatCondition.STARTS_WITH:
-    //   return 'Starts with';
-    // case StringFormatCondition.ENDS_WITH:
-    //   return 'Ends with';
-    default:
-      return '==';
+    case NumberFormatCondition.IS_EQUAL:
+      return `${columnName} == ${value}`;
+    case NumberFormatCondition.IS_NOT_EQUAL:
+      return `${columnName} != ${value}`;
+    case NumberFormatCondition.IS_BETWEEN:
+      return `${columnName} == ${value}`;
+    case NumberFormatCondition.GREATER_THAN:
+      return `${columnName} > ${value}`;
+    case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
+      return `${columnName} >= ${value}`;
+    case NumberFormatCondition.LESS_THAN:
+      return `${columnName} < ${value}`;
+    case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+      return `${columnName} <= ${value}`;
   }
 }
 
-export function getTextForConditionType(
+export function getTextForStringCondition(
+  columnName: string,
+  condition: StringFormatCondition,
+  value: unknown
+): string {
+  switch (condition) {
+    case StringFormatCondition.IS_EXACTLY:
+      return `${columnName} == "${value}"`;
+    case StringFormatCondition.IS_NOT_EXACTLY:
+      return `${columnName} != "${value}"`;
+    case StringFormatCondition.CONTAINS:
+      return `${columnName}.contains("${value}")`;
+    case StringFormatCondition.DOES_NOT_CONTAIN:
+      return `!${columnName}.contains("${value}")`;
+    case StringFormatCondition.STARTS_WITH:
+      return `${columnName}.startsWith("${value}")`;
+    case StringFormatCondition.ENDS_WITH:
+      return `${columnName}.endsWith("${value}")`;
+  }
+}
+
+export function getLabelForConditionType(
   columnType: string,
   condition: StringFormatCondition | NumberFormatCondition
 ): string {
   if (TableUtils.isNumberType(columnType)) {
-    return getTextForNumberCondition(condition as NumberFormatCondition);
+    return getShortLabelForNumberCondition(condition as NumberFormatCondition);
   }
-  return getTextForStringCondition(condition as StringFormatCondition);
+  return getShortLabelForStringCondition(condition as StringFormatCondition);
 }
 
 function getFormatterTypeIcon(option: FormatterType): JSX.Element | undefined {
