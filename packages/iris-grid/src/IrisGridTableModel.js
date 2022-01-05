@@ -1,7 +1,7 @@
 /* eslint class-methods-use-this: "off" */
 import memoize from 'memoize-one';
 import throttle from 'lodash.throttle';
-import { GridRange } from '@deephaven/grid';
+import { GridRange, memoizeClear } from '@deephaven/grid';
 import dh from '@deephaven/jsapi-shim';
 import Log from '@deephaven/log';
 import { PromiseUtils } from '@deephaven/utils';
@@ -78,6 +78,8 @@ class IrisGridTableModel extends IrisGridModel {
     // These rows can be sparse, so using a map instead of an array.
     this.pendingNewDataMap = new Map();
     this.pendingNewRowCount = 0;
+
+    this.userFrozenColumns = null;
   }
 
   close() {
@@ -463,65 +465,105 @@ class IrisGridTableModel extends IrisGridModel {
     return '';
   }
 
-  getColumnsWithLayoutHints = memoize((columns, hints) => {
-    if (hints) {
-      const columnMap = new Map();
-      columns.forEach(col => columnMap.set(col.name, col));
+  getColumnsWithLayoutHints = memoize(
+    (columnMap, frontColumns, backColumns, frozenColumns) => {
+      const columns = [...columnMap.values()];
+      if (frontColumns.length || backColumns.length || frozenColumns.length) {
+        let finalFrontColumns = [];
+        let finalBackColumns = [];
+        let finalFrozenColumns = [];
 
-      let frontColumns = [];
-      let backColumns = [];
-      let frozenColumns = [];
+        if (frontColumns.length) {
+          finalFrontColumns = frontColumns
+            .map(name => columnMap.get(name))
+            .filter(Boolean);
+        }
+        if (backColumns.length) {
+          finalBackColumns = backColumns
+            .map(name => columnMap.get(name))
+            .filter(Boolean);
+        }
+        if (frozenColumns.length) {
+          finalFrozenColumns = frozenColumns
+            .map(name => columnMap.get(name))
+            .filter(Boolean);
+        }
 
-      if (hints.frontColumns) {
-        frontColumns = hints.frontColumns
-          .map(name => columnMap.get(name))
-          .filter(Boolean);
-      }
-      if (hints.backColumns) {
-        backColumns = hints.backColumns
-          .map(name => columnMap.get(name))
-          .filter(Boolean);
-      }
-      if (hints.frozenColumns) {
-        frozenColumns = hints.frozenColumns
-          .map(name => columnMap.get(name))
-          .filter(Boolean);
-      }
+        if (
+          finalFrontColumns.length !== frontColumns.length ||
+          finalBackColumns.length !== backColumns.length ||
+          finalFrozenColumns.length !== frozenColumns.length
+        ) {
+          throw new Error(
+            'Layout hints are invalid (contain invalid column names)'
+          );
+        }
 
-      if (
-        frontColumns.length !== (hints.frontColumns?.length ?? 0) ||
-        backColumns.length !== (hints.backColumns?.length ?? 0) ||
-        frozenColumns.length !== (hints.frozenColumns?.length ?? 0)
-      ) {
-        throw new Error(
-          'Layout hints are invalid (contain invalid column names)'
+        const frontColumnSet = new Set(finalFrontColumns);
+        const backColumnSet = new Set(finalBackColumns);
+        const frozenColumnSet = new Set(finalFrozenColumns);
+        const middleColumns = columns.filter(
+          col =>
+            !frontColumnSet.has(col) &&
+            !backColumnSet.has(col) &&
+            !frozenColumnSet.has(col)
         );
+
+        return [
+          ...finalFrozenColumns,
+          ...finalFrontColumns,
+          ...middleColumns,
+          ...finalBackColumns,
+        ];
       }
-
-      const frontColumnSet = new Set(frontColumns);
-      const backColumnSet = new Set(backColumns);
-      const frozenColumnSet = new Set(frozenColumns);
-      const middleColumns = columns.filter(
-        col =>
-          !frontColumnSet.has(col) &&
-          !backColumnSet.has(col) &&
-          !frozenColumnSet.has(col)
-      );
-
-      return [
-        ...frozenColumns,
-        ...frontColumns,
-        ...middleColumns,
-        ...backColumns,
-      ];
+      return columns;
     }
-    return columns;
-  });
+  );
 
   get columns() {
     return this.getColumnsWithLayoutHints(
-      this.table.columns,
-      this.table.layoutHints
+      this.columnMap,
+      this.frontColumns,
+      this.backColumns,
+      this.frozenColumns
+    );
+  }
+
+  getMemoizedColumnMap = memoize(tableColumns => {
+    const columnMap = new Map();
+    tableColumns.forEach(col => columnMap.set(col.name, col));
+    return columnMap;
+  });
+
+  get columnMap() {
+    return this.getMemoizedColumnMap(this.table.columns);
+  }
+
+  getMemoizedFrontColumns = memoize(
+    layoutHintsFrontColumns => layoutHintsFrontColumns ?? []
+  );
+
+  get frontColumns() {
+    return this.getMemoizedFrontColumns(this.layoutHints?.frontColumns);
+  }
+
+  getMemoizedBackColumns = memoize(
+    layoutHintsBackColumns => layoutHintsBackColumns ?? []
+  );
+
+  get backColumns() {
+    return this.getMemoizedBackColumns(this.layoutHints?.backColumns);
+  }
+
+  getMemoizedFrozenColumns = memoize(
+    (layoutHintsFrozenColumns, userFrozenColumns) =>
+      userFrozenColumns ?? layoutHintsFrozenColumns ?? []
+  );
+
+  get frozenColumns() {
+    return this.getMemoizedFrozenColumns(
+      this.layoutHints?.frozenColumns,
+      this.userFrozenColumns
     );
   }
 
@@ -530,7 +572,7 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   get floatingLeftColumnCount() {
-    return this.layoutHints?.frozenColumns?.length ?? 0;
+    return this.frozenColumns.length;
   }
 
   get groupedColumns() {
@@ -831,6 +873,11 @@ class IrisGridTableModel extends IrisGridModel {
     log.debug('formatColumns - apply', formatColumns);
     this.table.applyCustomColumns([...this.customColumnList, ...formatColumns]);
     this.applyViewport();
+  }
+
+  updateFrozenColumns(columns) {
+    this.userFrozenColumns = columns;
+    this.dispatchEvent(new CustomEvent(IrisGridModel.EVENT.TABLE_CHANGED));
   }
 
   set totalsConfig(totalsConfig) {
@@ -1194,7 +1241,7 @@ class IrisGridTableModel extends IrisGridModel {
     if (
       this.layoutHints?.frontColumns?.includes(columnName) ||
       this.layoutHints?.backColumns?.includes(columnName) ||
-      this.layoutHints?.frozenColumns?.includes(columnName)
+      this.frozenColumns.includes(columnName)
     ) {
       return false;
     }
@@ -1202,9 +1249,7 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   isColumnFrozen(x) {
-    return (
-      this.layoutHints?.frozenColumns?.includes(this.columns[x].name) ?? false
-    );
+    return this.frozenColumns.includes(this.columns[x].name);
   }
 
   isKeyColumn(x) {
@@ -1426,7 +1471,9 @@ class IrisGridTableModel extends IrisGridModel {
     log.debug('setValues(', edits, ')');
     if (
       !edits.every(edit =>
-        this.isEditableRange(GridRange.makeCell(edit.x, edit.y))
+        this.isEditableRange(
+          GridRange.makeCell(edit.column ?? edit.x, edit.row ?? edit.y)
+        )
       )
     ) {
       throw new Error('Uneditable ranges', edits);
@@ -1437,7 +1484,9 @@ class IrisGridTableModel extends IrisGridModel {
 
       // Cache the display values
       edits.forEach(edit => {
-        const { x, y, text } = edit;
+        const { text } = edit;
+        const x = edit.column ?? edit.x;
+        const y = edit.row ?? edit.y;
         const column = this.columns[x];
         const value = TableUtils.makeValue(
           column.type,
@@ -1480,15 +1529,18 @@ class IrisGridTableModel extends IrisGridModel {
 
       // Need to group by row...
       const rowEditMap = edits.reduce((rowMap, edit) => {
-        if (!rowMap.has(edit.y)) {
-          rowMap.set(edit.y, []);
+        const y = edit.row ?? edit.y;
+        if (!rowMap.has(y)) {
+          rowMap.set(y, []);
         }
-        rowMap.get(edit.y).push(edit);
+        rowMap.get(y).push(edit);
         return rowMap;
       }, new Map());
 
       const ranges = GridRange.consolidate(
-        edits.map(edit => GridRange.makeCell(edit.x, edit.y))
+        edits.map(edit =>
+          GridRange.makeCell(edit.column ?? edit.x, edit.row ?? edit.y)
+        )
       );
       const tableAreaRange = this.getTableAreaRange();
       const tableRanges = ranges
@@ -1523,7 +1575,7 @@ class IrisGridTableModel extends IrisGridModel {
           const rowEdits = rowEditMap.get(rowIndex);
           if (rowEdits != null) {
             rowEdits.forEach(edit => {
-              const column = this.columns[edit.x];
+              const column = this.columns[edit.column ?? edit.x];
               newRow[column.name] = TableUtils.makeValue(
                 column.type,
                 edit.text,
@@ -1546,7 +1598,9 @@ class IrisGridTableModel extends IrisGridModel {
       // The update event could be received on the next tick, after the input rows have been committed,
       // so make sure we don't display stale data
       edits.forEach(edit => {
-        const { x, y, text } = edit;
+        const { text } = edit;
+        const x = edit.column ?? edit.x;
+        const y = edit.row ?? edit.y;
         const column = this.columns[x];
         const value = TableUtils.makeValue(
           column.type,
@@ -1561,7 +1615,7 @@ class IrisGridTableModel extends IrisGridModel {
       });
     } finally {
       edits.forEach(edit => {
-        this.clearPendingValue(edit.x, edit.y);
+        this.clearPendingValue(edit.column, edit.row);
       });
     }
   }

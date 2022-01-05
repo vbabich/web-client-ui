@@ -15,7 +15,6 @@ import {
   TableUtils,
 } from '@deephaven/iris-grid';
 import AdvancedSettings from '@deephaven/iris-grid/dist/sidebar/AdvancedSettings';
-import { PropTypes as APIPropTypes } from '@deephaven/jsapi-shim';
 import Log from '@deephaven/log';
 import { getSettings, getUser, getWorkspace } from '@deephaven/redux';
 import { PromiseUtils } from '@deephaven/utils';
@@ -123,6 +122,7 @@ export class IrisGridPanel extends PureComponent {
       pluginFetchColumns: [],
       modelQueue: [],
       pendingDataMap: new Map(),
+      frozenColumns: null,
 
       // eslint-disable-next-line react/no-unused-state
       panelState, // Dehydrated panel state that can load this panel
@@ -245,7 +245,8 @@ export class IrisGridPanel extends PureComponent {
       userRowHeights,
       aggregationSettings,
       advancedSettings,
-      pendingDataMap
+      pendingDataMap,
+      frozenColumns
     ) =>
       IrisGridUtils.dehydrateIrisGridState(model, {
         advancedFilters,
@@ -269,6 +270,7 @@ export class IrisGridPanel extends PureComponent {
         sorts,
         invertSearchColumns,
         pendingDataMap,
+        frozenColumns,
       })
   );
 
@@ -699,6 +701,7 @@ export class IrisGridPanel extends PureComponent {
         selectedSearchColumns,
         invertSearchColumns,
         pendingDataMap,
+        frozenColumns,
       } = IrisGridUtils.hydrateIrisGridState(model, irisGridState);
       const { movedColumns, movedRows } = IrisGridUtils.hydrateGridState(
         model,
@@ -730,6 +733,7 @@ export class IrisGridPanel extends PureComponent {
         selectedSearchColumns,
         invertSearchColumns,
         pendingDataMap,
+        frozenColumns,
       });
     } catch (error) {
       log.error('loadPanelState failed to load panelState', panelState, error);
@@ -765,6 +769,7 @@ export class IrisGridPanel extends PureComponent {
       invertSearchColumns,
       metrics,
       pendingDataMap,
+      frozenColumns,
     } = irisGridState;
     const { userColumnWidths, userRowHeights } = metrics;
     const { movedColumns, movedRows } = gridState;
@@ -796,7 +801,8 @@ export class IrisGridPanel extends PureComponent {
         userRowHeights,
         aggregationSettings,
         advancedSettings,
-        pendingDataMap
+        pendingDataMap,
+        frozenColumns
       ),
       this.getDehydratedGridState(model, movedColumns, movedRows),
       pluginState
@@ -868,6 +874,7 @@ export class IrisGridPanel extends PureComponent {
       pluginFilters,
       pluginFetchColumns,
       pendingDataMap,
+      frozenColumns,
     } = this.state;
     const errorMessage = error ? `Unable to open table. ${error}` : null;
     const { table: name, querySerial } = metadata;
@@ -876,6 +883,8 @@ export class IrisGridPanel extends PureComponent {
     const childrenContent =
       children ??
       this.getPluginContent(Plugin, model?.table, user, workspace, pluginState);
+    const { permissions } = user;
+    const { canCopy, canDownloadCsv } = permissions;
 
     return (
       <WidgetPanel
@@ -945,8 +954,11 @@ export class IrisGridPanel extends PureComponent {
             onAdvancedSettingsChange={this.handleAdvancedSettingsChange}
             customFilters={pluginFilters}
             pendingDataMap={pendingDataMap}
+            canCopy={canCopy}
+            canDownloadCsv={canDownloadCsv}
             ref={this.irisGrid}
             getDownloadWorker={getDownloadWorker}
+            frozenColumns={frozenColumns}
           >
             {childrenContent}
           </IrisGrid>
@@ -977,6 +989,7 @@ IrisGridPanel.propTypes = {
         columns: PropTypes.arrayOf(PropTypes.string).isRequired,
       }),
       pendingDataMap: PropTypes.arrayOf(PropTypes.array),
+      frozenColumns: PropTypes.arrayOf(PropTypes.string),
     }),
     irisGridPanelState: PropTypes.shape({}),
     pluginState: PropTypes.shape({}),
@@ -987,7 +1000,7 @@ IrisGridPanel.propTypes = {
   columnSelectionValidator: PropTypes.func,
   onStateChange: PropTypes.func,
   onPanelStateUpdate: PropTypes.func,
-  user: APIPropTypes.User.isRequired,
+  user: UIPropTypes.User.isRequired,
   workspace: PropTypes.shape({}).isRequired,
   settings: PropTypes.shape({ timeZone: PropTypes.string.isRequired })
     .isRequired,

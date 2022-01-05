@@ -1,12 +1,12 @@
 {
   "name": "@deephaven/mocks",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Deephaven Mocks for common libraries",
   "repository": "https://github.com/deephaven/web-client-ui",
   "author": "Deephaven Data Labs LLC",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./index.js",
+  "main": "./src/index.js",
   "peerDependencies": {
     "jest": "26.x"
   },

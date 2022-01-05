@@ -10,8 +10,10 @@ import {
   DEFAULT_DASHBOARD_ID,
   setDashboardData as setDashboardDataAction,
 } from '@deephaven/dashboard';
-import { setDashboardSessionWrapper as setDashboardSessionWrapperAction } from '@deephaven/dashboard-core-plugins';
-import ToolType from '@deephaven/dashboard-core-plugins/dist/linker/ToolType';
+import {
+  setDashboardSessionWrapper as setDashboardSessionWrapperAction,
+  ToolType,
+} from '@deephaven/dashboard-core-plugins';
 import { WebdavFileStorage } from '@deephaven/file-explorer';
 import dh from '@deephaven/jsapi-shim';
 import Log from '@deephaven/log';
@@ -38,7 +40,22 @@ const log = Log.module('AppInit');
 
 // Default values used
 const NAME = 'user';
-const USER = { name: NAME, operateAs: NAME };
+const USER = {
+  name: NAME,
+  operateAs: NAME,
+  groups: [],
+  permissions: {
+    isSuperUser: false,
+    isQueryViewOnly: false,
+    isNonInteractive: false,
+    canUsePanels: true,
+    canCreateDashboard: true,
+    canCreateCodeStudio: true,
+    canCreateQueryMonitor: true,
+    canCopy: true,
+    canDownloadCsv: true,
+  },
+};
 const WORKSPACE_STORAGE = new LocalWorkspaceStorage();
 const COMMAND_HISTORY_STORAGE = new PouchCommandHistoryStorage();
 const FILE_STORAGE = new WebdavFileStorage(

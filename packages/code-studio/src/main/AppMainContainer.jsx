@@ -15,6 +15,7 @@ import {
 import Dashboard, {
   DEFAULT_DASHBOARD_ID,
   getDashboardData,
+  updateDashboardData as updateDashboardDataAction,
 } from '@deephaven/dashboard';
 import {
   ChartEvent,
@@ -29,9 +30,10 @@ import {
   MarkdownPlugin,
   PandasPlugin,
   getDashboardSessionWrapper,
+  UIPropTypes,
+  ControlType,
+  ToolType,
 } from '@deephaven/dashboard-core-plugins';
-import ControlType from '@deephaven/dashboard-core-plugins/dist/controls/ControlType';
-import ToolType from '@deephaven/dashboard-core-plugins/dist/linker/ToolType';
 import { vsGear, dhShapes, dhPanels } from '@deephaven/icons';
 import dh, { PropTypes as APIPropTypes } from '@deephaven/jsapi-shim';
 import Log from '@deephaven/log';
@@ -333,11 +335,12 @@ export class AppMainContainer extends Component {
     try {
       const { workspace } = this.props;
       const { data } = workspace;
-      const { layoutConfig = [] } = data;
+      const { filterSets, layoutConfig, links } = data;
+      const exportedConfig = { filterSets, layoutConfig, links, version: 2 };
 
-      log.info('Exporting layoutConfig', layoutConfig);
+      log.info('handleExportLayoutClick exportedConfig', exportedConfig);
 
-      const blob = new Blob([JSON.stringify(layoutConfig)], {
+      const blob = new Blob([JSON.stringify(exportedConfig)], {
         mimeType: 'application/json',
       });
       const timestamp = dh.i18n.DateTimeFormat.format(
@@ -384,13 +387,30 @@ export class AppMainContainer extends Component {
    */
   async importLayoutFile(file) {
     try {
+      const { updateDashboardData, updateWorkspaceData } = this.props;
       const fileText = await file.text();
-      const layoutConfig = JSON.parse(fileText);
-
-      const { updateWorkspaceData } = this.props;
-      updateWorkspaceData({ layoutConfig });
+      const importedConfig = JSON.parse(fileText);
+      if (importedConfig.version !== undefined) {
+        const { version } = importedConfig;
+        if (version === 2) {
+          const { filterSets, layoutConfig, links } = importedConfig;
+          updateWorkspaceData({ layoutConfig });
+          updateDashboardData(DEFAULT_DASHBOARD_ID, {
+            filterSets,
+            layoutConfig,
+            links,
+          });
+        } else {
+          throw new Error(
+            `Unexpected import config version ${version}: ${importedConfig}`
+          );
+        }
+      } else {
+        // Legacy import - just a layout config being imported
+        updateWorkspaceData({ layoutConfig: importedConfig });
+      }
     } catch (e) {
-      log.error('Unable to export layout', e);
+      log.error('Unable to import layout', e);
     }
   }
 
@@ -500,6 +520,8 @@ export class AppMainContainer extends Component {
     const { data: workspaceData = {} } = workspace;
     const { data = EMPTY_OBJECT, layoutConfig } = workspaceData;
     const { layoutSettings = EMPTY_OBJECT } = data;
+    const { permissions } = user;
+    const { canUsePanels } = permissions;
     const {
       contextActions,
       isPanelsMenuShown,
@@ -538,30 +560,32 @@ export class AppMainContainer extends Component {
                   onClearFilter={this.handleClearFilter}
                 />
               </button>
-              <button
-                type="button"
-                className="btn btn-link btn-panels-menu btn-show-panels"
-                data-testid="app-main-panels-button"
-                onClick={this.handleWidgetMenuClick}
-              >
-                <FontAwesomeIcon icon={dhPanels} />
-                Panels
-                <Popper
-                  isShown={isPanelsMenuShown}
-                  className="panels-menu-popper"
-                  onExited={this.handleWidgetsMenuClose}
-                  closeOnBlur
-                  interactive
+              {canUsePanels && (
+                <button
+                  type="button"
+                  className="btn btn-link btn-panels-menu btn-show-panels"
+                  data-testid="app-main-panels-button"
+                  onClick={this.handleWidgetMenuClick}
                 >
-                  <WidgetList
-                    widgets={widgets}
-                    onExportLayout={this.handleExportLayoutClick}
-                    onImportLayout={this.handleImportLayoutClick}
-                    onResetLayout={this.handleResetLayoutClick}
-                    onSelect={this.handleWidgetSelect}
-                  />
-                </Popper>
-              </button>
+                  <FontAwesomeIcon icon={dhPanels} />
+                  Panels
+                  <Popper
+                    isShown={isPanelsMenuShown}
+                    className="panels-menu-popper"
+                    onExited={this.handleWidgetsMenuClose}
+                    closeOnBlur
+                    interactive
+                  >
+                    <WidgetList
+                      widgets={widgets}
+                      onExportLayout={this.handleExportLayoutClick}
+                      onImportLayout={this.handleImportLayoutClick}
+                      onResetLayout={this.handleResetLayoutClick}
+                      onSelect={this.handleWidgetSelect}
+                    />
+                  </Popper>
+                </button>
+              )}
               <button
                 type="button"
                 className={classNames(
@@ -629,12 +653,16 @@ AppMainContainer.propTypes = {
   layoutStorage: PropTypes.shape({}).isRequired,
   session: APIPropTypes.IdeSession.isRequired,
   setActiveTool: PropTypes.func.isRequired,
+  updateDashboardData: PropTypes.func.isRequired,
   updateWorkspaceData: PropTypes.func.isRequired,
-  user: APIPropTypes.User.isRequired,
+  user: UIPropTypes.User.isRequired,
   workspace: PropTypes.shape({
     data: PropTypes.shape({
       data: PropTypes.shape({}),
+      filterSets: PropTypes.arrayOf(PropTypes.shape({})),
       layoutConfig: PropTypes.arrayOf(PropTypes.shape({})),
+      settings: PropTypes.shape({}),
+      links: PropTypes.arrayOf(PropTypes.shape({})),
     }),
   }).isRequired,
 };
@@ -650,5 +678,6 @@ const mapStateToProps = state => ({
 
 export default connect(mapStateToProps, {
   setActiveTool: setActiveToolAction,
+  updateDashboardData: updateDashboardDataAction,
   updateWorkspaceData: updateWorkspaceDataAction,
 })(AppMainContainer);

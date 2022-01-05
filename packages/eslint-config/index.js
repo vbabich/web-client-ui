@@ -3,10 +3,9 @@ module.exports = {
     browser: true,
     jest: true,
     es6: true,
-    node: true,
   },
   extends: ['react-app', 'airbnb', 'plugin:react/recommended', 'prettier'],
-  plugins: ['es', 'prettier', 'react', 'react-hooks'],
+  plugins: ['es', 'prettier', 'react', 'react-hooks', 'import'],
   rules: {
     'prettier/prettier': ['error'],
     'react/forbid-prop-types': 'off',
@@ -45,10 +44,12 @@ module.exports = {
     ecmaFeatures: {
       jsx: true,
     },
+    sourceType: 'module',
   },
   settings: {
     'import/external-module-folders': ['node_modules', 'packages'],
     'import/resolver': {
+      typescript: {},
       node: {
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
       },
@@ -78,6 +79,7 @@ module.exports = {
         '@typescript-eslint/no-shadow': ['error'],
         'no-use-before-define': 'off',
         '@typescript-eslint/no-use-before-define': 'error',
+        'no-useless-constructor': 'off',
         'react/static-property-placement': ['error', 'static public field'],
         'react/require-default-props': [
           'error',

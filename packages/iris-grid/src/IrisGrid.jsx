@@ -220,6 +220,8 @@ export class IrisGrid extends Component {
     this.pending = new Pending();
     this.globalColumnFormats = [];
     this.dateTimeFormatterOptions = {};
+    this.decimalFormatOptions = {};
+    this.integerFormatOptions = {};
 
     // When the loading scrim started/when it should extend to the end of the screen.
     this.loadingScrimStartTime = null;
@@ -269,20 +271,6 @@ export class IrisGrid extends Component {
       this.commitAction,
     ];
 
-    const keyHandlers = [
-      new CopyKeyHandler(this),
-      new ReverseKeyHandler(this),
-      new ClearFilterKeyHandler(this),
-    ];
-    const mouseHandlers = [
-      new IrisGridColumnSelectMouseHandler(this),
-      new IrisGridColumnTooltipMouseHandler(this),
-      new IrisGridSortMouseHandler(this),
-      new IrisGridFilterMouseHandler(this),
-      new IrisGridContextMenuHandler(this),
-      new IrisGridDataSelectMouseHandler(this),
-      new PendingMouseHandler(this),
-    ];
     const {
       aggregationSettings,
       conditionalFormats,
@@ -305,7 +293,27 @@ export class IrisGrid extends Component {
       quickFilters,
       selectDistinctColumns,
       pendingDataMap,
+      canCopy,
+      frozenColumns,
     } = props;
+
+    const keyHandlers = [
+      new ReverseKeyHandler(this),
+      new ClearFilterKeyHandler(this),
+    ];
+    if (canCopy) {
+      keyHandlers.push(new CopyKeyHandler(this));
+    }
+    const mouseHandlers = [
+      new IrisGridColumnSelectMouseHandler(this),
+      new IrisGridColumnTooltipMouseHandler(this),
+      new IrisGridSortMouseHandler(this),
+      new IrisGridFilterMouseHandler(this),
+      new IrisGridContextMenuHandler(this),
+      new IrisGridDataSelectMouseHandler(this),
+      new PendingMouseHandler(this),
+    ];
+
     const metricCalculator = new IrisGridMetricCalculator({
       userColumnWidths: new Map(userColumnWidths),
       userRowHeights: new Map(userRowHeights),
@@ -395,6 +403,7 @@ export class IrisGrid extends Component {
       pendingSaveError: null,
 
       toastMessage: null,
+      frozenColumns,
     };
   }
 
@@ -528,7 +537,8 @@ export class IrisGrid extends Component {
       toggleFilterBarAction,
       toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar
+      showSearchBar,
+      canDownloadCsv
     ) => {
       const optionItems = [];
       if (isChartBuilderAvailable) {
@@ -576,7 +586,7 @@ export class IrisGrid extends Component {
           icon: vsRuby,
         });
       }
-      if (isExportAvailable) {
+      if (isExportAvailable && canDownloadCsv) {
         optionItems.push({
           type: OptionType.TABLE_EXPORTER,
           title: 'Download CSV',
@@ -754,7 +764,11 @@ export class IrisGrid extends Component {
   );
 
   getCachedTheme = memoize(
-    isEditable => ({ ...IrisGridTheme, autoSelectRow: !isEditable }),
+    (theme, isEditable) => ({
+      ...IrisGridTheme,
+      autoSelectRow: !isEditable,
+      ...theme,
+    }),
     { max: 1 }
   );
 
@@ -789,8 +803,8 @@ export class IrisGrid extends Component {
   }
 
   getTheme() {
-    const { model } = this.props;
-    return this.getCachedTheme(model.isEditable);
+    const { model, theme } = this.props;
+    return this.getCachedTheme(theme, model.isEditable);
   }
 
   getVisibleColumn(modelIndex) {
@@ -1057,6 +1071,10 @@ export class IrisGrid extends Component {
     const dateTimeFormatterOptions = FormatterUtils.getDateTimeFormatterOptions(
       settings
     );
+    const {
+      defaultDecimalFormatOptions = {},
+      defaultIntegerFormatOptions = {},
+    } = settings;
 
     const isColumnFormatChanged = !deepEqual(
       this.globalColumnFormats,
@@ -1066,9 +1084,24 @@ export class IrisGrid extends Component {
       this.dateTimeFormatterOptions,
       dateTimeFormatterOptions
     );
-    if (isColumnFormatChanged || isDateFormattingChanged) {
+    const isDecimalFormattingChanged = !deepEqual(
+      this.decimalFormatOptions,
+      defaultDecimalFormatOptions
+    );
+    const isIntegerFormattingChanged = !deepEqual(
+      this.integerFormatOptions,
+      defaultIntegerFormatOptions
+    );
+    if (
+      isColumnFormatChanged ||
+      isDateFormattingChanged ||
+      isDecimalFormattingChanged ||
+      isIntegerFormattingChanged
+    ) {
       this.globalColumnFormats = globalColumnFormats;
       this.dateTimeFormatterOptions = dateTimeFormatterOptions;
+      this.decimalFormatOptions = defaultDecimalFormatOptions;
+      this.integerFormatOptions = defaultIntegerFormatOptions;
       this.updateFormatter({}, forceUpdate);
 
       if (isDateFormattingChanged && forceUpdate) {
@@ -1121,7 +1154,9 @@ export class IrisGrid extends Component {
     ];
     const formatter = new Formatter(
       mergedColumnFormats,
-      this.dateTimeFormatterOptions
+      this.dateTimeFormatterOptions,
+      this.decimalFormatOptions,
+      this.integerFormatOptions
     );
 
     log.debug('updateFormatter', this.globalColumnFormats, mergedColumnFormats);
@@ -1226,10 +1261,15 @@ export class IrisGrid extends Component {
   }
 
   copyCell(columnIndex, rowIndex, rawValue = false) {
-    const value = this.getValueForCell(columnIndex, rowIndex, rawValue);
-    ContextActionUtils.copyToClipboard(value).catch(e =>
-      log.error('Unable to copy cell', e)
-    );
+    const { canCopy } = this.props;
+    if (canCopy) {
+      const value = this.getValueForCell(columnIndex, rowIndex, rawValue);
+      ContextActionUtils.copyToClipboard(value).catch(e =>
+        log.error('Unable to copy cell', e)
+      );
+    } else {
+      log.error('Attempted to copyCell for user without copy permission.');
+    }
   }
 
   /**
@@ -1245,24 +1285,28 @@ export class IrisGrid extends Component {
     formatValues = true,
     error = null
   ) {
-    const { model } = this.props;
+    const { model, canCopy } = this.props;
     const { metricCalculator, movedColumns } = this.state;
     const { userColumnWidths } = metricCalculator;
 
-    const copyOperation = {
-      ranges: GridRange.boundedRanges(
-        ranges,
-        model.columnCount,
-        model.rowCount
-      ),
-      includeHeaders,
-      formatValues,
-      movedColumns,
-      userColumnWidths,
-      error,
-    };
+    if (canCopy) {
+      const copyOperation = {
+        ranges: GridRange.boundedRanges(
+          ranges,
+          model.columnCount,
+          model.rowCount
+        ),
+        includeHeaders,
+        formatValues,
+        movedColumns,
+        userColumnWidths,
+        error,
+      };
 
-    this.setState({ copyOperation });
+      this.setState({ copyOperation });
+    } else {
+      log.error('Attempted copyRanges for user without copy permission.');
+    }
   }
 
   startLoading(loadingText, resetRanges = false) {
@@ -1422,6 +1466,46 @@ export class IrisGrid extends Component {
     );
 
     this.grid.forceUpdate();
+  }
+
+  freezeColumnByColumnName(columnName) {
+    const { frozenColumns } = this.state;
+    const { model } = this.props;
+    log.debug2('freezing column', columnName);
+
+    let allFrozenColumns;
+
+    if (frozenColumns == null) {
+      allFrozenColumns = new Set(model.layoutHints?.frozenColumns ?? []);
+      allFrozenColumns.add(columnName);
+    } else {
+      allFrozenColumns = new Set([...frozenColumns, columnName]);
+    }
+
+    this.setState({
+      frozenColumns: [...allFrozenColumns],
+    });
+  }
+
+  unFreezeColumnByColumnName(columnName) {
+    const { frozenColumns } = this.state;
+    const { model } = this.props;
+    log.debug2('unfreezing column', columnName);
+
+    let allFrozenColumns;
+
+    if (frozenColumns == null) {
+      allFrozenColumns = new Set(model.layoutHints?.frozenColumns ?? []);
+      allFrozenColumns.delete(columnName);
+    } else {
+      allFrozenColumns = new Set(
+        frozenColumns.filter(col => col !== columnName)
+      );
+    }
+
+    this.setState({
+      frozenColumns: [...allFrozenColumns],
+    });
   }
 
   handleColumnVisibilityChanged(modelIndexes, visibilityOption) {
@@ -2193,24 +2277,38 @@ export class IrisGrid extends Component {
   }
 
   handleDownloadTableStart() {
-    this.setState({
-      isTableDownloading: true,
-      tableDownloadProgress: 0,
-      tableDownloadEstimatedTime: null,
-      tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.INITIATING,
-    });
+    const { canDownloadCsv } = this.props;
+    if (canDownloadCsv) {
+      this.setState({
+        isTableDownloading: true,
+        tableDownloadProgress: 0,
+        tableDownloadEstimatedTime: null,
+        tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.INITIATING,
+      });
+    } else {
+      log.error(
+        'Attempted to handleDownloadTableStart for user without download CSV permission.'
+      );
+    }
   }
 
   handleDownloadTable(...args) {
-    log.info('start table downloading', ...args);
-    this.setState(() => {
-      if (this.tableSaver) {
-        this.tableSaver.startDownload(...args);
-      }
-      return {
-        tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING,
-      };
-    });
+    const { canDownloadCsv } = this.props;
+    if (canDownloadCsv) {
+      log.info('start table downloading', ...args);
+      this.setState(() => {
+        if (this.tableSaver) {
+          this.tableSaver.startDownload(...args);
+        }
+        return {
+          tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING,
+        };
+      });
+    } else {
+      log.error(
+        'Attempted to handleDownloadTable for user without download CSV permission.'
+      );
+    }
   }
 
   handleCancelDownloadTable() {
@@ -2309,6 +2407,7 @@ export class IrisGrid extends Component {
       alwaysFetchColumns,
       advancedSettings,
       onAdvancedSettingsChange,
+      canDownloadCsv,
     } = this.props;
     const {
       metricCalculator,
@@ -2368,6 +2467,7 @@ export class IrisGrid extends Component {
       pendingDataErrors,
       pendingDataMap,
       toastMessage,
+      frozenColumns,
     } = this.state;
     if (!isReady) {
       return null;
@@ -2769,7 +2869,8 @@ export class IrisGrid extends Component {
       this.toggleFilterBarAction,
       this.toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar
+      showSearchBar,
+      canDownloadCsv
     );
 
     const openOptionsStack = openOptions.map(option => {
@@ -3003,6 +3104,7 @@ export class IrisGrid extends Component {
                 selectDistinctColumns={selectDistinctColumns}
                 pendingRowCount={pendingRowCount}
                 pendingDataMap={pendingDataMap}
+                frozenColumns={frozenColumns}
               />
             )}
             <div
@@ -3194,6 +3296,13 @@ IrisGrid.propTypes = {
 
   pendingDataMap: PropTypes.instanceOf(Map),
   getDownloadWorker: PropTypes.func,
+
+  canCopy: PropTypes.bool,
+  canDownloadCsv: PropTypes.bool,
+  frozenColumns: PropTypes.arrayOf(PropTypes.string),
+
+  // Theme override for IrisGridTheme
+  theme: PropTypes.shape({}),
 };
 
 IrisGrid.defaultProps = {
@@ -3248,7 +3357,17 @@ IrisGrid.defaultProps = {
     showTimeZone: false,
     showTSeparator: true,
     formatter: [],
+    decimalFormatOptions: PropTypes.shape({
+      defaultFormatString: PropTypes.string,
+    }),
+    integerFormatOptions: PropTypes.shape({
+      defaultFormatString: PropTypes.string,
+    }),
   },
+  canCopy: true,
+  canDownloadCsv: true,
+  frozenColumns: null,
+  theme: {},
 };
 
 export default IrisGrid;

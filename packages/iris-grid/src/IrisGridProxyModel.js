@@ -286,6 +286,10 @@ class IrisGridProxyModel extends IrisGridModel {
     return this.model.layoutHints;
   }
 
+  updateFrozenColumns(...args) {
+    this.model.updateFrozenColumns(...args);
+  }
+
   get originalColumns() {
     return this.originalModel.columns;
   }
@@ -460,10 +464,6 @@ class IrisGridProxyModel extends IrisGridModel {
 
   async columnStatistics(...args) {
     return this.model.columnStatistics(...args);
-  }
-
-  async columnFormatMap() {
-    return this.model.columnFormatMap();
   }
 
   editValueForCell(...args) {

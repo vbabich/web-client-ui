@@ -196,6 +196,13 @@ class IrisGridModel extends GridModel {
   }
 
   /**
+   * @param {String[]} columns The columns to treat as frozen
+   */
+  updateFrozenColumns(columns) {
+    throw new Error('updateFrozenColumns not implemented');
+  }
+
+  /**
    * @returns {dh.RollupTableConfig} The config to use for rolling up this table
    */
   get rollupConfig() {
@@ -409,6 +416,15 @@ class IrisGridModel extends GridModel {
    */
   isRowMovable() {
     return false;
+  }
+
+  /**
+   * Delete ranges from an input grid. Will delete the entire row, causing data to shift up
+   * @param {GridRange[]} ranges The ranges to delete
+   * @returns {Promise<void>} A promise that resolves successfully when the operation is complete or rejects if there's an error
+   */
+  delete(ranges) {
+    throw new Error('delete not implemented');
   }
 }
 

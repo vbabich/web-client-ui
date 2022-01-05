@@ -103,6 +103,7 @@ class IrisGridUtils {
       sorts,
       invertSearchColumns,
       pendingDataMap = new Map(),
+      frozenColumns,
     } = irisGridState;
     const { userColumnWidths, userRowHeights } = metrics;
 
@@ -140,6 +141,7 @@ class IrisGridUtils {
         columns,
         pendingDataMap
       ),
+      frozenColumns,
     };
   }
 
@@ -169,8 +171,8 @@ class IrisGridUtils {
       selectedSearchColumns,
       invertSearchColumns = true,
       pendingDataMap = [],
+      frozenColumns,
     } = irisGridState;
-
     const { columns, formatter } = model;
     return {
       advancedFilters: IrisGridUtils.hydrateAdvancedFilters(
@@ -218,6 +220,7 @@ class IrisGridUtils {
         columns,
         pendingDataMap
       ),
+      frozenColumns,
     };
   }
 
