@@ -1,11 +1,13 @@
 import { TableUtils } from '../..';
 import {
   FormatStyleConfig,
+  getTextForDateCondition,
   getTextForNumberCondition,
   getTextForStringCondition,
 } from '../ConditionalFormattingEditor';
 import {
   ConditionConfig,
+  DateFormatCondition,
   FormatStyleType,
   NumberFormatCondition,
   StringFormatCondition,
@@ -32,7 +34,7 @@ export function getLabelForStyleType(option: FormatStyleType): string {
   }
 }
 
-export function getColorForStyleConfig(
+export function getBackgroundForStyleConfig(
   config: FormatStyleConfig
 ): string | null {
   const { type, customConfig } = config;
@@ -59,18 +61,49 @@ export function getColorForStyleConfig(
   }
 }
 
+export function getColorForStyleConfig(
+  config: FormatStyleConfig
+): string | null {
+  const { type, customConfig } = config;
+  switch (type) {
+    case FormatStyleType.NO_FORMATTING:
+      return null;
+    case FormatStyleType.POSITIVE:
+      return '#526a3f';
+    case FormatStyleType.NEGATIVE:
+      return '#802f44';
+    case FormatStyleType.WARN:
+      return '#663318';
+    case FormatStyleType.NEUTRAL:
+      return '#63562b';
+    case FormatStyleType.ACCENT_1:
+      return '#3f6469';
+    case FormatStyleType.ACCENT_2:
+      return '#554d72';
+    case FormatStyleType.CUSTOM:
+      // TODO: test with unset custom bg
+      return customConfig === undefined ? null : customConfig.color;
+    default:
+      return null;
+  }
+}
+
 export function getTextForStyleConfig(
   config: FormatStyleConfig
 ): string | null {
-  return `bgfga(\`${getColorForStyleConfig(config)}\`)`;
+  return `bgfg(\`${getBackgroundForStyleConfig(
+    config
+  )}\`, \`${getColorForStyleConfig(config)}\`)`;
 }
 
 function getNumberConditionText(config: ConditionConfig): string {
-  const { column, value } = config;
+  const { column, value, start, end } = config;
   return getTextForNumberCondition(
     column.name,
     config.condition as NumberFormatCondition,
-    value
+    value,
+    start,
+    end
   );
 }
 
@@ -79,6 +112,15 @@ function getStringConditionText(config: ConditionConfig): string {
   return getTextForStringCondition(
     column.name,
     config.condition as StringFormatCondition,
+    value
+  );
+}
+
+function getDateConditionText(config: ConditionConfig): string {
+  const { column, value } = config;
+  return getTextForDateCondition(
+    column.name,
+    config.condition as DateFormatCondition,
     value
   );
 }
@@ -93,5 +135,9 @@ export function getConditionText(config: ConditionConfig): string {
     return getStringConditionText(config);
   }
 
-  throw new Error('Invalid condition config');
+  if (TableUtils.isDateType(column.type)) {
+    return getDateConditionText(config);
+  }
+
+  throw new Error('Invalid column type');
 }

@@ -11,7 +11,7 @@ import { getLabelForStyleType } from './ConditionalFormattingUtils';
 
 import '../ConditionalFormattingEditor.scss';
 
-const log = Log.module('ConditionalRuleEditor');
+const log = Log.module('ConditionalRowFormatEditor');
 
 export enum NumberFormatCondition {
   IS_EQUAL = 'is-equal',
@@ -71,7 +71,7 @@ export interface ConditionConfig {
   style: FormatStyleConfig;
 }
 
-export interface ConditionalRuleEditorProps {
+export interface ConditionalRowFormatEditorProps {
   columns: ModelColumn[];
   config?: ConditionConfig;
   onChange?: FormattingRuleEditorChangeCallback;
@@ -230,8 +230,8 @@ const styleOptions = [
   </option>
 ));
 
-const ConditionalRuleEditor = (
-  props: ConditionalRuleEditorProps
+const ConditionalRowFormatEditor = (
+  props: ConditionalRowFormatEditorProps
 ): JSX.Element => {
   const {
     columns,
@@ -559,7 +559,7 @@ const ConditionalRuleEditor = (
     <div className="conditional-rule-editor form">
       <div className="mb-2">
         <label className="mb-0" htmlFor="column-select">
-          Apply to Column
+          Format Row If
         </label>
         <select
           value={selectedColumn?.name}
@@ -574,9 +574,6 @@ const ConditionalRuleEditor = (
       {selectedColumn !== undefined && (
         <>
           <div className="mb-2">
-            <label className="mb-0" htmlFor="condition-select">
-              Format Cell If
-            </label>
             <select
               // TODO: separate condition editor as a component, one for each type?
               // Pass a callback with a completed condition string?
@@ -623,4 +620,4 @@ const ConditionalRuleEditor = (
   );
 };
 
-export default ConditionalRuleEditor;
+export default ConditionalRowFormatEditor;

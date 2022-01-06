@@ -18,15 +18,14 @@ import ConditionalRuleEditor, {
   FormatStyleType,
   ConditionConfig,
   getLabelForStringCondition,
+  DateFormatCondition,
 } from './conditional-formatting/ConditionalRuleEditor';
 import { getLabelForStyleType } from './conditional-formatting/ConditionalFormattingUtils';
+import ConditionalRowFormatEditor from './conditional-formatting/ConditionalRowFormatEditor';
 
 const log = Log.module('ConditionalFormattingEditor');
 
-export type ConditionalFormattingApplyCallback = (
-  rule: FormattingRule,
-  index?: number
-) => void;
+export type ConditionalFormattingSaveCallback = (rule: FormattingRule) => void;
 
 export type ConditionalFormattingCancelCallback = () => void;
 
@@ -62,7 +61,7 @@ export enum ColorScaleType {
 export interface FormatStyleConfig {
   type: FormatStyleType;
   customConfig?: {
-    foreground: string;
+    color: string;
     background: string;
   };
 }
@@ -119,10 +118,10 @@ export interface FormattingRule {
 export interface ConditionalFormattingEditorProps {
   columns: ModelColumn[];
   rule?: FormattingRule;
-  id?: number;
   disableCancel?: boolean;
-  onApply?: ConditionalFormattingApplyCallback;
   onCancel?: ConditionalFormattingCancelCallback;
+  onSave?: ConditionalFormattingSaveCallback;
+  onUpdate?: ConditionalFormattingSaveCallback;
 }
 
 const DEFAULT_CALLBACK = () => undefined;
@@ -166,6 +165,23 @@ function getShortLabelForStringCondition(
   }
 }
 
+function getShortLabelForDateCondition(condition: DateFormatCondition): string {
+  switch (condition) {
+    case DateFormatCondition.IS_EXACTLY:
+      return '==';
+    case DateFormatCondition.IS_NOT_EXACTLY:
+      return '!=';
+    case DateFormatCondition.IS_BEFORE:
+      return '<';
+    case DateFormatCondition.IS_BEFORE_OR_EQUAL:
+      return '<=';
+    case DateFormatCondition.IS_AFTER:
+      return '>';
+    case DateFormatCondition.IS_AFTER_OR_EQUAL:
+      return '>=';
+  }
+}
+
 export function getShortLabelForNumberCondition(
   condition: NumberFormatCondition
 ): string {
@@ -190,7 +206,9 @@ export function getShortLabelForNumberCondition(
 export function getTextForNumberCondition(
   columnName: string,
   condition: NumberFormatCondition,
-  value: unknown
+  value: unknown,
+  start: unknown,
+  end: unknown
 ): string {
   switch (condition) {
     case NumberFormatCondition.IS_EQUAL:
@@ -198,7 +216,7 @@ export function getTextForNumberCondition(
     case NumberFormatCondition.IS_NOT_EQUAL:
       return `${columnName} != ${value}`;
     case NumberFormatCondition.IS_BETWEEN:
-      return `${columnName} == ${value}`;
+      return `${columnName} > ${start} && ${columnName} < ${end}`;
     case NumberFormatCondition.GREATER_THAN:
       return `${columnName} > ${value}`;
     case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
@@ -231,14 +249,44 @@ export function getTextForStringCondition(
   }
 }
 
+export function getTextForDateCondition(
+  columnName: string,
+  condition: DateFormatCondition,
+  value: unknown
+): string {
+  switch (condition) {
+    case DateFormatCondition.IS_EXACTLY:
+      return `${columnName} == convertDateTime("${value}")`;
+    case DateFormatCondition.IS_NOT_EXACTLY:
+      return `${columnName} != convertDateTime(\`${value}\`)`;
+    case DateFormatCondition.IS_BEFORE:
+      return `${columnName} < convertDateTime(\`${value}\`)`;
+    case DateFormatCondition.IS_BEFORE_OR_EQUAL:
+      return `${columnName} <=  convertDateTime("${value}")`;
+    case DateFormatCondition.IS_AFTER:
+      return `${columnName} > convertDateTime(\`${value}\`)`;
+    case DateFormatCondition.IS_AFTER_OR_EQUAL:
+      return `${columnName} >=  convertDateTime(\`${value}\`)`;
+  }
+}
+
 export function getLabelForConditionType(
   columnType: string,
-  condition: StringFormatCondition | NumberFormatCondition
+  condition: StringFormatCondition | NumberFormatCondition | DateFormatCondition
 ): string {
   if (TableUtils.isNumberType(columnType)) {
     return getShortLabelForNumberCondition(condition as NumberFormatCondition);
   }
-  return getShortLabelForStringCondition(condition as StringFormatCondition);
+
+  if (TableUtils.isTextType(columnType)) {
+    return getShortLabelForStringCondition(condition as StringFormatCondition);
+  }
+
+  if (TableUtils.isDateType(columnType)) {
+    return getShortLabelForDateCondition(condition as DateFormatCondition);
+  }
+
+  throw new Error('Invalid column type');
 }
 
 function getFormatterTypeIcon(option: FormatterType): JSX.Element | undefined {
@@ -352,14 +400,13 @@ const ConditionalFormattingEditor = (
 ): JSX.Element => {
   const {
     columns,
-    onApply = DEFAULT_CALLBACK,
+    onSave = DEFAULT_CALLBACK,
+    onUpdate = DEFAULT_CALLBACK,
     onCancel = DEFAULT_CALLBACK,
-    id,
-    rule: defaultRule = undefined,
+    rule: defaultRule,
     disableCancel = false,
   } = props;
 
-  // TODO
   const { type: defaultType, config } = defaultRule ?? makeDefaultRule(columns);
   const { column: defaultColumn } = config;
 
@@ -411,15 +458,6 @@ const ConditionalFormattingEditor = (
       : undefined
   );
 
-  log.debug(
-    'loop',
-    selectedColumnType,
-    rule,
-    defaultType,
-    defaultColumn,
-    config
-  );
-
   const handleColumnChange = useCallback(
     e => {
       const { value } = e.target;
@@ -443,69 +481,21 @@ const ConditionalFormattingEditor = (
 
   const handleApply = useCallback(() => {
     // TODO: validation
-
     if (rule === undefined) {
       log.error('Unable to apply formatting. Rule is not defined.');
       return;
     }
+    onSave(rule);
+  }, [onSave, rule]);
 
-    // if (selectedColumn === undefined) {
-    //   log.error('Unable to create formatting rule. Column is not selected.');
-    //   return;
-    // }
-
-    // if (selectedStyle === undefined) {
-    //   log.error('Unable to create formatting rule. Style is not selected.');
-    //   return;
-    // }
-
-    // if (selectedCondition === undefined) {
-    //   log.error('Unable to create formatting rule. Condition is not selected.');
-    //   return;
-    // }
-
-    // const { type, name } = selectedColumn;
-    // const column = { type, name };
-
-    // log.debug(
-    //   'TEST',
-    //   TableUtils.isNumberType(selectedColumn.type),
-    //   Number.isNaN(Number(conditionValue))
-    // );
-
-    // if (
-    //   TableUtils.isNumberType(selectedColumn.type) &&
-    //   Number.isNaN(Number(conditionValue))
-    // ) {
-    //   log.error(
-    //     'Unable to create formatting rule. Invalid value',
-    //     conditionValue
-    //   );
-    //   return;
-    // }
-    // const rule = `${
-    //   selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
-    // } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
-    // TODO: build config based on formatter type, conditions, values, style, etc
-    // onApply(
-    //   {
-    //     type: selectedFormatter,
-    //     config: {
-    //       column,
-    //       condition: selectedCondition,
-    //       style: {
-    //         type: selectedStyle,
-    //         // TODO
-    //         customConfig: undefined,
-    //       },
-    //       value: conditionValue,
-    //     },
-    //   },
-    //   id
-    // );
-
-    onApply(rule, id);
-  }, [onApply, rule, id]);
+  // const handleUpdate = useCallback(() => {
+  //   // TODO: validation
+  //   if (rule === undefined) {
+  //     log.error('Unable to apply formatting. Rule is not defined.');
+  //     return;
+  //   }
+  //   onUpdate(rule);
+  // }, [onUpdate, rule]);
 
   const handleFormatterChange = useCallback(value => {
     log.debug('handleFormatterChange', value);
@@ -540,12 +530,14 @@ const ConditionalFormattingEditor = (
         log.debug('Unable to create new rule - formatter not selected.');
         return;
       }
-      setRule({
+      const updatedRule = {
         type: selectedFormatter,
         config: ruleConfig as ConditionConfig,
-      });
+      };
+      setRule(updatedRule);
+      onUpdate(updatedRule);
     },
-    [selectedFormatter]
+    [onUpdate, selectedFormatter]
   );
 
   const conditionInputs = useMemo(() => {
@@ -647,7 +639,15 @@ const ConditionalFormattingEditor = (
         />
       )}
 
-      {selectedFormatter !== FormatterType.CONDITIONAL && (
+      {selectedFormatter === FormatterType.ROWS && (
+        <ConditionalRowFormatEditor
+          columns={columns}
+          config={rule?.config as ConditionConfig}
+          onChange={handleRuleChange}
+        />
+      )}
+
+      {/* {selectedFormatter !== FormatterType.CONDITIONAL && (
         <div className="mb-2">
           <label className="mb-0" htmlFor="column-select">
             {selectedFormatter === FormatterType.ROWS
@@ -663,18 +663,19 @@ const ConditionalFormattingEditor = (
             {columnOptions}
           </select>
         </div>
-      )}
+      )} */}
 
-      {(selectedFormatter === FormatterType.ADVANCED ||
+      {selectedFormatter === FormatterType.ADVANCED &&
+        // ||
         // TODO
-        selectedFormatter === FormatterType.ROWS) &&
+        // selectedFormatter === FormatterType.ROWS
         selectedColumn !== undefined && (
           <>
             <div className="mb-2">
               <label className="mb-0" htmlFor="condition-select">
-                {selectedFormatter === FormatterType.ROWS
+                {/* {selectedFormatter === FormatterType.ROWS
                   ? ''
-                  : 'Format Cell If'}
+                  : 'Format Cell If'} */}
               </label>
               <select
                 // TODO: separate condition editor as a component, one for each type?
@@ -783,7 +784,7 @@ const ConditionalFormattingEditor = (
           onClick={handleApply}
           disabled={
             selectedFormatter !== FormatterType.CONDITIONAL &&
-            selectedFormatter !== FormatterType.ADVANCED &&
+            // selectedFormatter !== FormatterType.ADVANCED &&
             selectedFormatter !== FormatterType.ROWS
           }
         >

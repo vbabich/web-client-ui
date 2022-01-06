@@ -1,26 +1,31 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import classNames from 'classnames';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { dhNewCircleLargeFilled, vsGripper, vsTrash } from '@deephaven/icons';
 import { Button, DragUtils, Tooltip } from '@deephaven/components';
 import Log from '@deephaven/log';
-import ConditionalFormattingEditor, {
+import {
   FormatterType,
   FormattingRule,
   getLabelForConditionType,
 } from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
-import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
+import {
+  ConditionConfig,
+  NumberFormatCondition,
+} from './conditional-formatting/ConditionalRuleEditor';
 import { getColorForStyleConfig } from './conditional-formatting/ConditionalFormattingUtils';
 import { TableUtils } from '..';
 
 const log = Log.module('ConditionalFormattingMenu');
 
-export type ConditionalFormattingMenuCallback = (
-  rules: FormattingRule[]
-) => void;
+export type ChangeCallback = (rules: FormattingRule[]) => void;
+
+export type SelectCallback = (index: number) => void;
+
+export type CreateCallback = () => void;
 
 export type ModelColumn = {
   name: string;
@@ -29,10 +34,13 @@ export type ModelColumn = {
 
 export type ConditionalFormattingMenuProps = {
   rules: FormattingRule[];
-  columns: ModelColumn[];
   selectedColumn?: string;
-  onChange?: ConditionalFormattingMenuCallback;
+  onChange?: ChangeCallback;
+  onCreate?: CreateCallback;
+  onSelect?: SelectCallback;
 };
+
+const DEFAULT_CALLBACK = () => undefined;
 
 function getRuleValue(config: ConditionConfig): string {
   const {
@@ -44,53 +52,44 @@ function getRuleValue(config: ConditionConfig): string {
   if (TableUtils.isTextType(type)) {
     return `"${config.value}"`;
   }
+  if (TableUtils.isDateType(type)) {
+    return `${config.value}`;
+  }
   throw new Error(`Invalid column type ${type} in getRuleValue`);
+}
+
+function getRuleTitle(config: ConditionConfig): string {
+  if (
+    TableUtils.isNumberType(config.column.type) &&
+    config.condition === NumberFormatCondition.IS_BETWEEN
+  ) {
+    return `${config.start} < ${config.column.name} < ${config.end}`;
+  }
+  return `${config.column.name} ${getLabelForConditionType(
+    (config as ConditionConfig).column.type,
+    (config as ConditionConfig).condition
+  )} 
+    ${getRuleValue(config as ConditionConfig)}`;
 }
 
 const ConditionalFormattingMenu = (
   props: ConditionalFormattingMenuProps
 ): JSX.Element => {
-  const { rules = [], columns, onChange = () => undefined } = props;
+  const {
+    rules = [],
+    onChange = DEFAULT_CALLBACK,
+    onCreate = DEFAULT_CALLBACK,
+    onSelect = DEFAULT_CALLBACK,
+  } = props;
 
-  const [selectedRuleId, setSelectedRuleId] = useState(undefined);
-
-  // TODO: remove callback?
-  const [createNewRule, setCreateNewRule] = useState(false);
-
-  const handleCancel = useCallback(() => {
-    log.debug('Cancel update');
-    setCreateNewRule(false);
-    setSelectedRuleId(undefined);
-  }, []);
-
-  const handleApply = useCallback(
-    (rule, index) => {
-      log.debug('Apply formatting', rule);
-      setCreateNewRule(false);
-      if (index === undefined) {
-        onChange([...rules, rule]);
-        return;
-      }
-      if (index < 0 || index >= rules.length) {
-        log.error('Unable to update the rules, index out of bounds');
-        return;
-      }
-      const updatedRules = [...rules];
-      updatedRules[index] = rule;
-      onChange(updatedRules);
+  const handleRuleClick = useCallback(
+    (e, rule, index) => {
+      e.stopPropagation();
+      log.debug('rule clicked', rule, index);
+      onSelect(index);
     },
-    [onChange, rules]
+    [onSelect]
   );
-
-  const handleAddClick = useCallback(() => {
-    setCreateNewRule(true);
-  }, []);
-
-  const handleRuleClick = useCallback((e, rule, index) => {
-    e.stopPropagation();
-    log.debug('rule clicked', rule, index);
-    setSelectedRuleId(index);
-  }, []);
 
   const handleDeleteClick = useCallback(
     (e, rule, index) => {
@@ -127,23 +126,6 @@ const ConditionalFormattingMenu = (
     },
     [onChange, rules]
   );
-
-  if (createNewRule || rules.length === 0 || selectedRuleId !== undefined) {
-    return (
-      <ConditionalFormattingEditor
-        columns={columns}
-        id={selectedRuleId}
-        rule={
-          selectedRuleId !== undefined
-            ? rules[(selectedRuleId as unknown) as number]
-            : undefined
-        }
-        onCancel={handleCancel}
-        onApply={handleApply}
-        disableCancel={rules.length === 0}
-      />
-    );
-  }
 
   // Display list of rules
   return (
@@ -195,18 +177,14 @@ const ConditionalFormattingMenu = (
                                       (rule.config as ConditionConfig).style
                                     ) ?? 'transparent',
                                 }}
-                              />
+                              >
+                                {rule.type === FormatterType.ROWS
+                                  ? 'row'
+                                  : 'col'}
+                              </span>
                             </div>
                             <div className="rule-title">
-                              {(rule.config as ConditionConfig).column.name}{' '}
-                              {rule.type === FormatterType.CONDITIONAL
-                                ? `${getLabelForConditionType(
-                                    (rule.config as ConditionConfig).column
-                                      .type,
-                                    (rule.config as ConditionConfig).condition
-                                  )} `
-                                : null}
-                              {getRuleValue(rule.config as ConditionConfig)}
+                              {getRuleTitle(rule.config as ConditionConfig)}
                             </div>
                             <button
                               type="button"
@@ -240,11 +218,7 @@ const ConditionalFormattingMenu = (
         </Droppable>
       </DragDropContext>
       <hr />
-      <Button
-        kind="ghost"
-        onClick={handleAddClick}
-        icon={dhNewCircleLargeFilled}
-      >
+      <Button kind="ghost" onClick={onCreate} icon={dhNewCircleLargeFilled}>
         Add New Rule
       </Button>
     </div>

@@ -92,7 +92,9 @@ import {
   getConditionText,
   getTextForStyleConfig,
 } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
-import ConditionalRuleEditor from './sidebar/conditional-formatting/ConditionalRuleEditor';
+import ConditionalFormattingEditor, {
+  FormatterType,
+} from './sidebar/ConditionalFormattingEditor';
 
 const log = Log.module('IrisGrid');
 
@@ -170,7 +172,22 @@ export class IrisGrid extends Component {
     this.handleTooltipRef = this.handleTooltipRef.bind(this);
     this.handleViewChanged = this.handleViewChanged.bind(this);
     this.handleFormatSelection = this.handleFormatSelection.bind(this);
+    this.handleConditionalFormatCreate = this.handleConditionalFormatCreate.bind(
+      this
+    );
+    this.handleConditionalFormatEdit = this.handleConditionalFormatEdit.bind(
+      this
+    );
     this.handleConditionalFormatsChange = this.handleConditionalFormatsChange.bind(
+      this
+    );
+    this.handleConditionalFormatEditorSave = this.handleConditionalFormatEditorSave.bind(
+      this
+    );
+    this.handleConditionalFormatEditorUpdate = this.handleConditionalFormatEditorUpdate.bind(
+      this
+    );
+    this.handleConditionalFormatEditorCancel = this.handleConditionalFormatEditorCancel.bind(
       this
     );
     this.handleUpdateCustomColumns = this.handleUpdateCustomColumns.bind(this);
@@ -220,8 +237,6 @@ export class IrisGrid extends Component {
     this.pending = new Pending();
     this.globalColumnFormats = [];
     this.dateTimeFormatterOptions = {};
-    this.decimalFormatOptions = {};
-    this.integerFormatOptions = {};
 
     // When the loading scrim started/when it should extend to the end of the screen.
     this.loadingScrimStartTime = null;
@@ -271,6 +286,20 @@ export class IrisGrid extends Component {
       this.commitAction,
     ];
 
+    const keyHandlers = [
+      new CopyKeyHandler(this),
+      new ReverseKeyHandler(this),
+      new ClearFilterKeyHandler(this),
+    ];
+    const mouseHandlers = [
+      new IrisGridColumnSelectMouseHandler(this),
+      new IrisGridColumnTooltipMouseHandler(this),
+      new IrisGridSortMouseHandler(this),
+      new IrisGridFilterMouseHandler(this),
+      new IrisGridContextMenuHandler(this),
+      new IrisGridDataSelectMouseHandler(this),
+      new PendingMouseHandler(this),
+    ];
     const {
       aggregationSettings,
       conditionalFormats,
@@ -293,27 +322,7 @@ export class IrisGrid extends Component {
       quickFilters,
       selectDistinctColumns,
       pendingDataMap,
-      canCopy,
-      frozenColumns,
     } = props;
-
-    const keyHandlers = [
-      new ReverseKeyHandler(this),
-      new ClearFilterKeyHandler(this),
-    ];
-    if (canCopy) {
-      keyHandlers.push(new CopyKeyHandler(this));
-    }
-    const mouseHandlers = [
-      new IrisGridColumnSelectMouseHandler(this),
-      new IrisGridColumnTooltipMouseHandler(this),
-      new IrisGridSortMouseHandler(this),
-      new IrisGridFilterMouseHandler(this),
-      new IrisGridContextMenuHandler(this),
-      new IrisGridDataSelectMouseHandler(this),
-      new PendingMouseHandler(this),
-    ];
-
     const metricCalculator = new IrisGridMetricCalculator({
       userColumnWidths: new Map(userColumnWidths),
       userRowHeights: new Map(userRowHeights),
@@ -373,6 +382,7 @@ export class IrisGrid extends Component {
       customColumnFormatMap: new Map(customColumnFormatMap),
 
       conditionalFormats,
+      conditionalFormatIndex: undefined,
 
       // Column user is hovering over for selection
       hoverSelectColumn: null,
@@ -403,7 +413,6 @@ export class IrisGrid extends Component {
       pendingSaveError: null,
 
       toastMessage: null,
-      frozenColumns,
     };
   }
 
@@ -537,8 +546,7 @@ export class IrisGrid extends Component {
       toggleFilterBarAction,
       toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar,
-      canDownloadCsv
+      showSearchBar
     ) => {
       const optionItems = [];
       if (isChartBuilderAvailable) {
@@ -586,7 +594,7 @@ export class IrisGrid extends Component {
           icon: vsRuby,
         });
       }
-      if (isExportAvailable && canDownloadCsv) {
+      if (isExportAvailable) {
         optionItems.push({
           type: OptionType.TABLE_EXPORTER,
           title: 'Download CSV',
@@ -666,13 +674,28 @@ export class IrisGrid extends Component {
     log.debug('getFormatColumns', columns, rules);
     const result = [];
     const formatColumnMap = new Map();
-    rules.forEach(({ config }) => {
+    const formatRowMap = new Map();
+    rules.forEach(({ config, type: formatterType }) => {
       // TODO: depends on formatter type, ROWS might have no columns property
       const { column } = config;
       // Check both name and type because the type can change
       const col = columns.find(
         ({ name, type }) => name === column.name && type === column.type
       );
+      if (formatterType === FormatterType.ROWS) {
+        const { rule: prevRule = null, index = undefined } =
+          formatRowMap.get(col.name) ?? {};
+        const rule = `${getConditionText(config)} ? ${getTextForStyleConfig(
+          config.style
+        )} : ${prevRule}`;
+        const formatRow = dh.Column.formatRowColor(rule);
+        if (index !== undefined) {
+          result.splice(index, 1);
+        }
+        result.push(formatRow);
+        formatRowMap.set(col.name, { rule, index: result.length - 1 });
+        return;
+      }
       if (!col) {
         log.debug(
           `Column ${column.name}:${column.type} not found. Ignoring format rule`,
@@ -764,11 +787,7 @@ export class IrisGrid extends Component {
   );
 
   getCachedTheme = memoize(
-    (theme, isEditable) => ({
-      ...IrisGridTheme,
-      autoSelectRow: !isEditable,
-      ...theme,
-    }),
+    isEditable => ({ ...IrisGridTheme, autoSelectRow: !isEditable }),
     { max: 1 }
   );
 
@@ -803,8 +822,8 @@ export class IrisGrid extends Component {
   }
 
   getTheme() {
-    const { model, theme } = this.props;
-    return this.getCachedTheme(theme, model.isEditable);
+    const { model } = this.props;
+    return this.getCachedTheme(model.isEditable);
   }
 
   getVisibleColumn(modelIndex) {
@@ -1071,10 +1090,6 @@ export class IrisGrid extends Component {
     const dateTimeFormatterOptions = FormatterUtils.getDateTimeFormatterOptions(
       settings
     );
-    const {
-      defaultDecimalFormatOptions = {},
-      defaultIntegerFormatOptions = {},
-    } = settings;
 
     const isColumnFormatChanged = !deepEqual(
       this.globalColumnFormats,
@@ -1084,24 +1099,9 @@ export class IrisGrid extends Component {
       this.dateTimeFormatterOptions,
       dateTimeFormatterOptions
     );
-    const isDecimalFormattingChanged = !deepEqual(
-      this.decimalFormatOptions,
-      defaultDecimalFormatOptions
-    );
-    const isIntegerFormattingChanged = !deepEqual(
-      this.integerFormatOptions,
-      defaultIntegerFormatOptions
-    );
-    if (
-      isColumnFormatChanged ||
-      isDateFormattingChanged ||
-      isDecimalFormattingChanged ||
-      isIntegerFormattingChanged
-    ) {
+    if (isColumnFormatChanged || isDateFormattingChanged) {
       this.globalColumnFormats = globalColumnFormats;
       this.dateTimeFormatterOptions = dateTimeFormatterOptions;
-      this.decimalFormatOptions = defaultDecimalFormatOptions;
-      this.integerFormatOptions = defaultIntegerFormatOptions;
       this.updateFormatter({}, forceUpdate);
 
       if (isDateFormattingChanged && forceUpdate) {
@@ -1154,9 +1154,7 @@ export class IrisGrid extends Component {
     ];
     const formatter = new Formatter(
       mergedColumnFormats,
-      this.dateTimeFormatterOptions,
-      this.decimalFormatOptions,
-      this.integerFormatOptions
+      this.dateTimeFormatterOptions
     );
 
     log.debug('updateFormatter', this.globalColumnFormats, mergedColumnFormats);
@@ -1261,15 +1259,10 @@ export class IrisGrid extends Component {
   }
 
   copyCell(columnIndex, rowIndex, rawValue = false) {
-    const { canCopy } = this.props;
-    if (canCopy) {
-      const value = this.getValueForCell(columnIndex, rowIndex, rawValue);
-      ContextActionUtils.copyToClipboard(value).catch(e =>
-        log.error('Unable to copy cell', e)
-      );
-    } else {
-      log.error('Attempted to copyCell for user without copy permission.');
-    }
+    const value = this.getValueForCell(columnIndex, rowIndex, rawValue);
+    ContextActionUtils.copyToClipboard(value).catch(e =>
+      log.error('Unable to copy cell', e)
+    );
   }
 
   /**
@@ -1285,28 +1278,24 @@ export class IrisGrid extends Component {
     formatValues = true,
     error = null
   ) {
-    const { model, canCopy } = this.props;
+    const { model } = this.props;
     const { metricCalculator, movedColumns } = this.state;
     const { userColumnWidths } = metricCalculator;
 
-    if (canCopy) {
-      const copyOperation = {
-        ranges: GridRange.boundedRanges(
-          ranges,
-          model.columnCount,
-          model.rowCount
-        ),
-        includeHeaders,
-        formatValues,
-        movedColumns,
-        userColumnWidths,
-        error,
-      };
+    const copyOperation = {
+      ranges: GridRange.boundedRanges(
+        ranges,
+        model.columnCount,
+        model.rowCount
+      ),
+      includeHeaders,
+      formatValues,
+      movedColumns,
+      userColumnWidths,
+      error,
+    };
 
-      this.setState({ copyOperation });
-    } else {
-      log.error('Attempted copyRanges for user without copy permission.');
-    }
+    this.setState({ copyOperation });
   }
 
   startLoading(loadingText, resetRanges = false) {
@@ -1466,46 +1455,6 @@ export class IrisGrid extends Component {
     );
 
     this.grid.forceUpdate();
-  }
-
-  freezeColumnByColumnName(columnName) {
-    const { frozenColumns } = this.state;
-    const { model } = this.props;
-    log.debug2('freezing column', columnName);
-
-    let allFrozenColumns;
-
-    if (frozenColumns == null) {
-      allFrozenColumns = new Set(model.layoutHints?.frozenColumns ?? []);
-      allFrozenColumns.add(columnName);
-    } else {
-      allFrozenColumns = new Set([...frozenColumns, columnName]);
-    }
-
-    this.setState({
-      frozenColumns: [...allFrozenColumns],
-    });
-  }
-
-  unFreezeColumnByColumnName(columnName) {
-    const { frozenColumns } = this.state;
-    const { model } = this.props;
-    log.debug2('unfreezing column', columnName);
-
-    let allFrozenColumns;
-
-    if (frozenColumns == null) {
-      allFrozenColumns = new Set(model.layoutHints?.frozenColumns ?? []);
-      allFrozenColumns.delete(columnName);
-    } else {
-      allFrozenColumns = new Set(
-        frozenColumns.filter(col => col !== columnName)
-      );
-    }
-
-    this.setState({
-      frozenColumns: [...allFrozenColumns],
-    });
   }
 
   handleColumnVisibilityChanged(modelIndexes, visibilityOption) {
@@ -2046,23 +1995,99 @@ export class IrisGrid extends Component {
   }
 
   handleConditionalFormatsChange(conditionalFormats) {
-    log.debug('handleConditionalFormatsChange', conditionalFormats);
+    log.debug('Updated conditional formats', conditionalFormats);
+    // TODO: only show spinner if the formats are actually different
+    // this.startLoading('Applying conditional formats...');
     this.setState({ conditionalFormats });
   }
 
-  handleConditionalFormatChange(config) {
-    log.debug('handleConditionalFormatChange', config);
+  handleConditionalFormatCreate() {
+    log.debug('Create new conditional format');
+    const { openOptions, conditionalFormats } = this.state;
+    this.setState({
+      openOptions: [
+        ...openOptions,
+        {
+          type: OptionType.CONDITIONAL_FORMATTING_EDIT,
+          title: `Create Formatting Rule`,
+        },
+      ],
+      conditionalFormatIndex: conditionalFormats.length,
+      prevConditionalFormat: undefined,
+    });
+  }
+
+  handleConditionalFormatEdit(index) {
+    log.debug('Edit conditional format', index);
+    const { openOptions, conditionalFormats } = this.state;
+    this.setState({
+      openOptions: [
+        ...openOptions,
+        {
+          type: OptionType.CONDITIONAL_FORMATTING_EDIT,
+          title: `Edit Formatting Rule`,
+        },
+      ],
+      conditionalFormatIndex: index,
+      // Save existing rule in case we need to cancel changes later
+      prevConditionalFormat: conditionalFormats[index],
+    });
+  }
+
+  // Apply live changes
+  handleConditionalFormatEditorUpdate(config) {
+    // TODO: only start loading of the config is actually different
+    // otherwise the spinner won't get the update event and won't stop
+    // this.startLoading('Applying conditional formats...');
     this.setState(state => {
-      if (config.id !== undefined) {
-        const conditionalFormats = [...state.conditionalFormats];
-        // const index = conditionalFormats.findIndex(({ id }) => id === config.id);
-        return { conditionalFormats, selectedConditionalFormat: undefined };
+      if (state.conditionalFormatIndex === undefined) {
+        log.debug('Invalid format index');
+        return null;
+      }
+      const conditionalFormats = [...state.conditionalFormats];
+      conditionalFormats[state.conditionalFormatIndex] = config;
+      return { conditionalFormats };
+    });
+  }
+
+  handleConditionalFormatEditorSave(config) {
+    log.debug('Save conditional format changes', config);
+    this.startLoading('Applying conditional formats...');
+    this.setState(state => {
+      if (state.conditionalFormatIndex === undefined) {
+        log.debug('Invalid format index');
+        return null;
+      }
+      const conditionalFormats = [...state.conditionalFormats];
+      conditionalFormats[state.conditionalFormatIndex] = config;
+      return { conditionalFormats };
+    });
+    // this.handleMenuBack();
+  }
+
+  handleConditionalFormatEditorCancel() {
+    this.handleMenuBack();
+    // TODO: timing?
+    this.setState(state => {
+      const { conditionalFormatIndex, prevConditionalFormat } = state;
+      log.debug(
+        'handleConditionalFormatEditorCancel',
+        conditionalFormatIndex,
+        prevConditionalFormat
+      );
+      if (state.conditionalFormatIndex === undefined) {
+        log.debug('Invalid format index');
+        return null;
       }
 
-      return {
-        conditionalFormats: [...state.conditionalFormats, config],
-        selectedConditionalFormat: undefined,
-      };
+      const conditionalFormats = [...state.conditionalFormats];
+      if (prevConditionalFormat !== undefined) {
+        conditionalFormats[conditionalFormatIndex] = prevConditionalFormat;
+      } else {
+        conditionalFormats.splice(conditionalFormats.length - 1, 1);
+      }
+      log.debug('canceled:', conditionalFormats);
+      return { conditionalFormats };
     });
   }
 
@@ -2277,38 +2302,24 @@ export class IrisGrid extends Component {
   }
 
   handleDownloadTableStart() {
-    const { canDownloadCsv } = this.props;
-    if (canDownloadCsv) {
-      this.setState({
-        isTableDownloading: true,
-        tableDownloadProgress: 0,
-        tableDownloadEstimatedTime: null,
-        tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.INITIATING,
-      });
-    } else {
-      log.error(
-        'Attempted to handleDownloadTableStart for user without download CSV permission.'
-      );
-    }
+    this.setState({
+      isTableDownloading: true,
+      tableDownloadProgress: 0,
+      tableDownloadEstimatedTime: null,
+      tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.INITIATING,
+    });
   }
 
   handleDownloadTable(...args) {
-    const { canDownloadCsv } = this.props;
-    if (canDownloadCsv) {
-      log.info('start table downloading', ...args);
-      this.setState(() => {
-        if (this.tableSaver) {
-          this.tableSaver.startDownload(...args);
-        }
-        return {
-          tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING,
-        };
-      });
-    } else {
-      log.error(
-        'Attempted to handleDownloadTable for user without download CSV permission.'
-      );
-    }
+    log.info('start table downloading', ...args);
+    this.setState(() => {
+      if (this.tableSaver) {
+        this.tableSaver.startDownload(...args);
+      }
+      return {
+        tableDownloadStatus: TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING,
+      };
+    });
   }
 
   handleCancelDownloadTable() {
@@ -2407,7 +2418,6 @@ export class IrisGrid extends Component {
       alwaysFetchColumns,
       advancedSettings,
       onAdvancedSettingsChange,
-      canDownloadCsv,
     } = this.props;
     const {
       metricCalculator,
@@ -2441,6 +2451,7 @@ export class IrisGrid extends Component {
 
       formatter,
       conditionalFormats,
+      conditionalFormatIndex,
 
       sorts,
       reverseType,
@@ -2467,7 +2478,6 @@ export class IrisGrid extends Component {
       pendingDataErrors,
       pendingDataMap,
       toastMessage,
-      frozenColumns,
     } = this.state;
     if (!isReady) {
       return null;
@@ -2869,8 +2879,7 @@ export class IrisGrid extends Component {
       this.toggleFilterBarAction,
       this.toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar,
-      canDownloadCsv
+      showSearchBar
     );
 
     const openOptionsStack = openOptions.map(option => {
@@ -2901,14 +2910,20 @@ export class IrisGrid extends Component {
               columns={model.columns}
               rules={conditionalFormats}
               onChange={this.handleConditionalFormatsChange}
+              onCreate={this.handleConditionalFormatCreate}
+              onSelect={this.handleConditionalFormatEdit}
             />
           );
         case OptionType.CONDITIONAL_FORMATTING_EDIT:
           return (
-            <ConditionalRuleEditor
+            <ConditionalFormattingEditor
               columns={model.columns}
-              config={selectedConditionalFormat}
-              onChange={this.handleConditionalRuleChange}
+              rule={conditionalFormats[conditionalFormatIndex]}
+              disableCancel={
+                conditionalFormats[conditionalFormatIndex] === undefined
+              }
+              onSave={this.handleConditionalFormatEditorSave}
+              onCancel={this.handleConditionalFormatEditorCancel}
             />
           );
         case OptionType.CUSTOM_COLUMN_BUILDER:
@@ -3104,7 +3119,6 @@ export class IrisGrid extends Component {
                 selectDistinctColumns={selectDistinctColumns}
                 pendingRowCount={pendingRowCount}
                 pendingDataMap={pendingDataMap}
-                frozenColumns={frozenColumns}
               />
             )}
             <div
@@ -3296,13 +3310,6 @@ IrisGrid.propTypes = {
 
   pendingDataMap: PropTypes.instanceOf(Map),
   getDownloadWorker: PropTypes.func,
-
-  canCopy: PropTypes.bool,
-  canDownloadCsv: PropTypes.bool,
-  frozenColumns: PropTypes.arrayOf(PropTypes.string),
-
-  // Theme override for IrisGridTheme
-  theme: PropTypes.shape({}),
 };
 
 IrisGrid.defaultProps = {
@@ -3357,17 +3364,7 @@ IrisGrid.defaultProps = {
     showTimeZone: false,
     showTSeparator: true,
     formatter: [],
-    decimalFormatOptions: PropTypes.shape({
-      defaultFormatString: PropTypes.string,
-    }),
-    integerFormatOptions: PropTypes.shape({
-      defaultFormatString: PropTypes.string,
-    }),
   },
-  canCopy: true,
-  canDownloadCsv: true,
-  frozenColumns: null,
-  theme: {},
 };
 
 export default IrisGrid;

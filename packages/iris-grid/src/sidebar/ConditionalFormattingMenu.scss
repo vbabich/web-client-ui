@@ -31,9 +31,11 @@
     }
 
     .rule-icon-bg {
-      width: 1em;
-      height: 1em;
+      min-width: 2rem;
+      height: 1rem;
       display: flex;
+      font-size: x-small;
+      padding: 0 $spacer-1;
     }
 
     .rule-title {
