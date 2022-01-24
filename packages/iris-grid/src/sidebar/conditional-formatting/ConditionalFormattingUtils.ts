@@ -36,11 +36,11 @@ export function getLabelForStyleType(option: FormatStyleType): string {
 
 export function getBackgroundForStyleConfig(
   config: FormatStyleConfig
-): string | null {
+): string | undefined {
   const { type, customConfig } = config;
   switch (type) {
     case FormatStyleType.NO_FORMATTING:
-      return null;
+      return undefined;
     case FormatStyleType.POSITIVE:
       return '#9fde6f';
     case FormatStyleType.NEGATIVE:
@@ -55,19 +55,19 @@ export function getBackgroundForStyleConfig(
       return '#ab9bf5';
     case FormatStyleType.CUSTOM:
       // TODO: test with unset custom bg
-      return customConfig === undefined ? null : customConfig.background;
+      return customConfig?.background;
     default:
-      return null;
+      return undefined;
   }
 }
 
 export function getColorForStyleConfig(
   config: FormatStyleConfig
-): string | null {
+): string | undefined {
   const { type, customConfig } = config;
   switch (type) {
     case FormatStyleType.NO_FORMATTING:
-      return null;
+      return undefined;
     case FormatStyleType.POSITIVE:
       return '#526a3f';
     case FormatStyleType.NEGATIVE:
@@ -81,19 +81,18 @@ export function getColorForStyleConfig(
     case FormatStyleType.ACCENT_2:
       return '#554d72';
     case FormatStyleType.CUSTOM:
-      // TODO: test with unset custom bg
-      return customConfig === undefined ? null : customConfig.color;
+      return customConfig?.color;
     default:
-      return null;
+      return undefined;
   }
 }
 
 export function getTextForStyleConfig(
   config: FormatStyleConfig
 ): string | null {
-  return `bgfg(\`${getBackgroundForStyleConfig(
-    config
-  )}\`, \`${getColorForStyleConfig(config)}\`)`;
+  return `bgfg(\`${getBackgroundForStyleConfig(config) ?? null}\`, \`${
+    getColorForStyleConfig(config) ?? null
+  }\`)`;
 }
 
 function getNumberConditionText(config: ConditionConfig): string {

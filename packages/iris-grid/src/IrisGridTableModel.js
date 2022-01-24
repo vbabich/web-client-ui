@@ -1248,7 +1248,8 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   isColumnFrozen(x) {
-    return this.frozenColumns.includes(this.columns[x].name);
+    return false;
+    // return this.frozenColumns.includes(this.columns[x].name);
   }
 
   isKeyColumn(x) {

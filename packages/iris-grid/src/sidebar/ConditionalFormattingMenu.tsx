@@ -16,7 +16,10 @@ import {
   ConditionConfig,
   NumberFormatCondition,
 } from './conditional-formatting/ConditionalRuleEditor';
-import { getColorForStyleConfig } from './conditional-formatting/ConditionalFormattingUtils';
+import {
+  getBackgroundForStyleConfig,
+  getColorForStyleConfig,
+} from './conditional-formatting/ConditionalFormattingUtils';
 import { TableUtils } from '..';
 
 const log = Log.module('ConditionalFormattingMenu');
@@ -172,10 +175,12 @@ const ConditionalFormattingMenu = (
                               <span
                                 className="rule-icon-bg"
                                 style={{
-                                  backgroundColor:
-                                    getColorForStyleConfig(
-                                      (rule.config as ConditionConfig).style
-                                    ) ?? 'transparent',
+                                  backgroundColor: getBackgroundForStyleConfig(
+                                    (rule.config as ConditionConfig).style
+                                  ),
+                                  color: getColorForStyleConfig(
+                                    (rule.config as ConditionConfig).style
+                                  ),
                                 }}
                               >
                                 {rule.type === FormatterType.ROWS

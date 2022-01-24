@@ -17,14 +17,18 @@
   .formatting-item {
     border-radius: $border-radius;
     display: flex;
-    // justify-content: space-between;
-    padding: 0 0 0 $spacer-2;
+    padding: $spacer-1;
     flex-grow: 1;
     align-items: center;
     user-select: none;
     transition: $btn-transition;
     border: $input-border-width solid transparent;
     line-height: $btn-line-height;
+    cursor: pointer;
+
+    .btn-drag-handle {
+      cursor: grab;
+    }
 
     .rule-icon {
       padding-right: $spacer-2;
@@ -32,10 +36,11 @@
 
     .rule-icon-bg {
       min-width: 2rem;
-      height: 1rem;
+      height: 2rem;
       display: flex;
       font-size: x-small;
-      padding: 0 $spacer-1;
+      justify-content: center;
+      align-items: center;
     }
 
     .rule-title {

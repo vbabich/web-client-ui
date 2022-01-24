@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Log from '@deephaven/log';
+import { ColorUtils } from '@deephaven/utils';
+import { AutoCompleteInput, ComboBox } from '@deephaven/components';
 import { TableUtils } from '../..';
 import {
   ModelColumn,
@@ -296,8 +298,7 @@ const ConditionalRowFormatEditor = (
   log.debug('loop', selectedColumnType, config, defaultColumn, config);
 
   const handleColumnChange = useCallback(
-    e => {
-      const { value } = e.target;
+    value => {
       const newColumn = columns.find(({ name }) => name === value);
       if (newColumn && selectedColumnType !== newColumn.type) {
         log.debug('handleColumnChange', selectedColumnType, newColumn.type);
@@ -457,7 +458,7 @@ const ConditionalRowFormatEditor = (
         type: selectedStyle,
         // TODO
         customConfig: {
-          foreground: '',
+          color: ColorUtils.isDark(selectedColor) ? '#f0f0ee' : '#1a171a',
           background: selectedColor,
         },
       },
@@ -549,26 +550,23 @@ const ConditionalRowFormatEditor = (
     handleEndValueChange,
   ]);
 
-  const columnOptions = columns.map(({ name }) => (
-    <option key={name} value={name}>
-      {name}
-    </option>
-  ));
+  const columnInputOptions = columns.map(({ name }) => ({
+    title: name,
+    value: name,
+  }));
 
   return (
     <div className="conditional-rule-editor form">
       <div className="mb-2">
-        <label className="mb-0" htmlFor="column-select">
-          Format Row If
-        </label>
-        <select
-          value={selectedColumn?.name}
-          className="custom-select"
-          id="column-select"
+        <label className="mb-0">Format Row If</label>
+        <ComboBox
+          defaultValue={selectedColumn?.name}
+          options={columnInputOptions}
+          inputPlaceholder="Select a column"
+          spellCheck={false}
           onChange={handleColumnChange}
-        >
-          {columnOptions}
-        </select>
+          searchPlaceholder="Filter columns"
+        />
       </div>
 
       {selectedColumn !== undefined && (

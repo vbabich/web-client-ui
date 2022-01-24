@@ -3,9 +3,15 @@
 .conditional-formatting-editor {
   padding: $spacer-3;
 
-  .col-formatter-type {
-    padding-left: 2px;
-    padding-right: 2px;
+  .formatter-list {
+    display: flex;
+    justify-content: flex-start;
+    padding-top: $spacer-2;
+  }
+
+  .formatter-type {
+    margin: 0 $spacer-3 0 0;
+    display: flex;
   }
 
   .btn-formatter-type {
