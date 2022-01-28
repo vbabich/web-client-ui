@@ -7,10 +7,10 @@ import {
 } from '../ConditionalFormattingEditor';
 import {
   ConditionConfig,
-  DateFormatCondition,
+  DateCondition,
   FormatStyleType,
-  NumberFormatCondition,
-  StringFormatCondition,
+  NumberCondition,
+  StringCondition,
 } from './ConditionalRuleEditor';
 
 export function getLabelForStyleType(option: FormatStyleType): string {
@@ -54,7 +54,6 @@ export function getBackgroundForStyleConfig(
     case FormatStyleType.ACCENT_2:
       return '#ab9bf5';
     case FormatStyleType.CUSTOM:
-      // TODO: test with unset custom bg
       return customConfig?.background;
     default:
       return undefined;
@@ -99,7 +98,7 @@ function getNumberConditionText(config: ConditionConfig): string {
   const { column, value, start, end } = config;
   return getTextForNumberCondition(
     column.name,
-    config.condition as NumberFormatCondition,
+    config.condition as NumberCondition,
     value,
     start,
     end
@@ -110,7 +109,7 @@ function getStringConditionText(config: ConditionConfig): string {
   const { column, value } = config;
   return getTextForStringCondition(
     column.name,
-    config.condition as StringFormatCondition,
+    config.condition as StringCondition,
     value
   );
 }
@@ -119,7 +118,7 @@ function getDateConditionText(config: ConditionConfig): string {
   const { column, value } = config;
   return getTextForDateCondition(
     column.name,
-    config.condition as DateFormatCondition,
+    config.condition as DateCondition,
     value
   );
 }

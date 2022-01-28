@@ -14,7 +14,7 @@ import {
 import './ConditionalFormattingMenu.scss';
 import {
   ConditionConfig,
-  NumberFormatCondition,
+  NumberCondition,
 } from './conditional-formatting/ConditionalRuleEditor';
 import {
   getBackgroundForStyleConfig,
@@ -64,7 +64,7 @@ function getRuleValue(config: ConditionConfig): string {
 function getRuleTitle(config: ConditionConfig): string {
   if (
     TableUtils.isNumberType(config.column.type) &&
-    config.condition === NumberFormatCondition.IS_BETWEEN
+    config.condition === NumberCondition.IS_BETWEEN
   ) {
     return `${config.start} < ${config.column.name} < ${config.end}`;
   }

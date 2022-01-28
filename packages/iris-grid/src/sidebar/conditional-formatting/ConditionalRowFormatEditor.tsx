@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Log from '@deephaven/log';
 import { ColorUtils } from '@deephaven/utils';
-import { AutoCompleteInput, ComboBox } from '@deephaven/components';
+import { ComboBox } from '@deephaven/components';
 import { TableUtils } from '../..';
 import {
   ModelColumn,
@@ -15,7 +15,7 @@ import '../ConditionalFormattingEditor.scss';
 
 const log = Log.module('ConditionalRowFormatEditor');
 
-export enum NumberFormatCondition {
+export enum NumberCondition {
   IS_EQUAL = 'is-equal',
   IS_NOT_EQUAL = 'is-not-equal',
   IS_BETWEEN = 'is-between',
@@ -25,7 +25,7 @@ export enum NumberFormatCondition {
   LESS_THAN_OR_EQUAL = 'less-than-or-equal',
 }
 
-export enum StringFormatCondition {
+export enum StringCondition {
   IS_EXACTLY = 'is-exactly',
   IS_NOT_EXACTLY = 'is-not-exactly',
   CONTAINS = 'contains',
@@ -34,7 +34,7 @@ export enum StringFormatCondition {
   ENDS_WITH = 'ends-with',
 }
 
-export enum DateFormatCondition {
+export enum DateCondition {
   IS_EXACTLY = 'is-exactly',
   IS_NOT_EXACTLY = 'is-not-exactly',
   IS_BEFORE = 'is-before',
@@ -63,10 +63,7 @@ export enum FormatPointType {
 
 export interface ConditionConfig {
   column: ModelColumn;
-  condition:
-    | NumberFormatCondition
-    | StringFormatCondition
-    | DateFormatCondition;
+  condition: NumberCondition | StringCondition | DateCondition;
   value?: string | number;
   start?: number;
   end?: number;
@@ -82,76 +79,72 @@ export interface ConditionalRowFormatEditorProps {
 const DEFAULT_CALLBACK = () => undefined;
 
 // TODO: move to utils?
-function getLabelForNumberCondition(condition: NumberFormatCondition): string {
+function getLabelForNumberCondition(condition: NumberCondition): string {
   switch (condition) {
-    case NumberFormatCondition.IS_EQUAL:
+    case NumberCondition.IS_EQUAL:
       return 'Is equal to';
-    case NumberFormatCondition.IS_NOT_EQUAL:
+    case NumberCondition.IS_NOT_EQUAL:
       return 'Is not equal to';
-    case NumberFormatCondition.IS_BETWEEN:
+    case NumberCondition.IS_BETWEEN:
       return 'Is between';
-    case NumberFormatCondition.GREATER_THAN:
+    case NumberCondition.GREATER_THAN:
       return 'Greater than';
-    case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
+    case NumberCondition.GREATER_THAN_OR_EQUAL:
       return 'Greater than or equal to';
-    case NumberFormatCondition.LESS_THAN:
+    case NumberCondition.LESS_THAN:
       return 'Less than';
-    case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+    case NumberCondition.LESS_THAN_OR_EQUAL:
       return 'Less than or equal to';
   }
 }
 
-export function getLabelForStringCondition(
-  condition: StringFormatCondition
-): string {
+export function getLabelForStringCondition(condition: StringCondition): string {
   switch (condition) {
-    case StringFormatCondition.IS_EXACTLY:
+    case StringCondition.IS_EXACTLY:
       return 'Is exactly';
-    case StringFormatCondition.IS_NOT_EXACTLY:
+    case StringCondition.IS_NOT_EXACTLY:
       return 'Is not exactly';
-    case StringFormatCondition.CONTAINS:
+    case StringCondition.CONTAINS:
       return 'Contains';
-    case StringFormatCondition.DOES_NOT_CONTAIN:
+    case StringCondition.DOES_NOT_CONTAIN:
       return 'Does not contain';
-    case StringFormatCondition.STARTS_WITH:
+    case StringCondition.STARTS_WITH:
       return 'Starts with';
-    case StringFormatCondition.ENDS_WITH:
+    case StringCondition.ENDS_WITH:
       return 'Ends with';
   }
 }
 
-export function getLabelForDateCondition(
-  condition: DateFormatCondition
-): string {
+export function getLabelForDateCondition(condition: DateCondition): string {
   switch (condition) {
-    case DateFormatCondition.IS_EXACTLY:
+    case DateCondition.IS_EXACTLY:
       return 'Is';
-    case DateFormatCondition.IS_NOT_EXACTLY:
+    case DateCondition.IS_NOT_EXACTLY:
       return 'Is not';
-    case DateFormatCondition.IS_BEFORE:
+    case DateCondition.IS_BEFORE:
       return 'Is before';
-    case DateFormatCondition.IS_BEFORE_OR_EQUAL:
+    case DateCondition.IS_BEFORE_OR_EQUAL:
       return 'Is before or equal';
-    case DateFormatCondition.IS_AFTER:
+    case DateCondition.IS_AFTER:
       return 'Is after';
-    case DateFormatCondition.IS_AFTER_OR_EQUAL:
+    case DateCondition.IS_AFTER_OR_EQUAL:
       return 'Is after or equal';
   }
 }
 
 function getDefaultConditionForType(
   columnType: string | undefined
-): NumberFormatCondition | StringFormatCondition | DateFormatCondition {
+): NumberCondition | StringCondition | DateCondition {
   if (TableUtils.isNumberType(columnType)) {
-    return NumberFormatCondition.IS_EQUAL;
+    return NumberCondition.IS_EQUAL;
   }
 
   if (TableUtils.isTextType(columnType)) {
-    return StringFormatCondition.IS_EXACTLY;
+    return StringCondition.IS_EXACTLY;
   }
 
   if (TableUtils.isDateType(columnType)) {
-    return DateFormatCondition.IS_EXACTLY;
+    return DateCondition.IS_EXACTLY;
   }
 
   throw new Error('Invalid column type');
@@ -177,40 +170,40 @@ function makeDefaultConfig(columns: ModelColumn[]): ConditionConfig {
   return config;
 }
 
-const numberFormatConditionOptions = [
-  NumberFormatCondition.IS_EQUAL,
-  NumberFormatCondition.IS_NOT_EQUAL,
-  NumberFormatCondition.IS_BETWEEN,
-  NumberFormatCondition.GREATER_THAN,
-  NumberFormatCondition.GREATER_THAN_OR_EQUAL,
-  NumberFormatCondition.LESS_THAN,
-  NumberFormatCondition.LESS_THAN_OR_EQUAL,
+const numberConditionOptions = [
+  NumberCondition.IS_EQUAL,
+  NumberCondition.IS_NOT_EQUAL,
+  NumberCondition.IS_BETWEEN,
+  NumberCondition.GREATER_THAN,
+  NumberCondition.GREATER_THAN_OR_EQUAL,
+  NumberCondition.LESS_THAN,
+  NumberCondition.LESS_THAN_OR_EQUAL,
 ].map(option => (
   <option key={option} value={option}>
     {getLabelForNumberCondition(option)}
   </option>
 ));
 
-const stringFormatConditions = [
-  StringFormatCondition.IS_EXACTLY,
-  StringFormatCondition.IS_NOT_EXACTLY,
-  StringFormatCondition.CONTAINS,
-  StringFormatCondition.DOES_NOT_CONTAIN,
-  StringFormatCondition.STARTS_WITH,
-  StringFormatCondition.ENDS_WITH,
+const stringConditions = [
+  StringCondition.IS_EXACTLY,
+  StringCondition.IS_NOT_EXACTLY,
+  StringCondition.CONTAINS,
+  StringCondition.DOES_NOT_CONTAIN,
+  StringCondition.STARTS_WITH,
+  StringCondition.ENDS_WITH,
 ].map(option => (
   <option key={option} value={option}>
     {getLabelForStringCondition(option)}
   </option>
 ));
 
-const dateFormatConditions = [
-  DateFormatCondition.IS_EXACTLY,
-  DateFormatCondition.IS_NOT_EXACTLY,
-  DateFormatCondition.IS_BEFORE,
-  DateFormatCondition.IS_BEFORE_OR_EQUAL,
-  DateFormatCondition.IS_AFTER,
-  DateFormatCondition.IS_AFTER_OR_EQUAL,
+const dateConditions = [
+  DateCondition.IS_EXACTLY,
+  DateCondition.IS_NOT_EXACTLY,
+  DateCondition.IS_BEFORE,
+  DateCondition.IS_BEFORE_OR_EQUAL,
+  DateCondition.IS_AFTER,
+  DateCondition.IS_AFTER_OR_EQUAL,
 ].map(option => (
   <option key={option} value={option}>
     {getLabelForDateCondition(option)}
@@ -273,20 +266,20 @@ const ConditionalRowFormatEditor = (
       return [];
     }
     if (TableUtils.isNumberType(selectedColumnType)) {
-      return numberFormatConditionOptions;
+      return numberConditionOptions;
     }
 
     if (TableUtils.isTextType(selectedColumnType)) {
-      return stringFormatConditions;
+      return stringConditions;
     }
 
     log.debug(
       'isDateType',
       TableUtils.isDateType(selectedColumnType),
-      dateFormatConditions
+      dateConditions
     );
     if (TableUtils.isDateType(selectedColumnType)) {
-      return dateFormatConditions;
+      return dateConditions;
     }
   }, [selectedColumnType]);
 
@@ -440,8 +433,8 @@ const ConditionalRowFormatEditor = (
     if (
       TableUtils.isNumberType(selectedColumn.type) &&
       ((Number.isNaN(Number(conditionValue)) &&
-        selectedCondition !== NumberFormatCondition.IS_BETWEEN) ||
-        (selectedCondition === NumberFormatCondition.IS_BETWEEN &&
+        selectedCondition !== NumberCondition.IS_BETWEEN) ||
+        (selectedCondition === NumberCondition.IS_BETWEEN &&
           (Number.isNaN(Number(startValue)) || Number.isNaN(Number(endValue)))))
     ) {
       log.error(
@@ -481,12 +474,12 @@ const ConditionalRowFormatEditor = (
     log.debug('conditionInputs useMemo', selectedColumnType, selectedCondition);
     if (TableUtils.isNumberType(selectedColumnType)) {
       switch (selectedCondition) {
-        case NumberFormatCondition.IS_EQUAL:
-        case NumberFormatCondition.IS_NOT_EQUAL:
-        case NumberFormatCondition.GREATER_THAN:
-        case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
-        case NumberFormatCondition.LESS_THAN:
-        case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+        case NumberCondition.IS_EQUAL:
+        case NumberCondition.IS_NOT_EQUAL:
+        case NumberCondition.GREATER_THAN:
+        case NumberCondition.GREATER_THAN_OR_EQUAL:
+        case NumberCondition.LESS_THAN:
+        case NumberCondition.LESS_THAN_OR_EQUAL:
           return (
             <input
               type="text"
@@ -496,7 +489,7 @@ const ConditionalRowFormatEditor = (
               onChange={handleValueChange}
             />
           );
-        case NumberFormatCondition.IS_BETWEEN:
+        case NumberCondition.IS_BETWEEN:
           return (
             <div className="d-flex flex-row">
               <input

@@ -7,12 +7,12 @@ import { TableUtils } from '..';
 
 import './ConditionalFormattingEditor.scss';
 import ConditionalRuleEditor, {
-  NumberFormatCondition,
-  StringFormatCondition,
+  NumberCondition,
+  StringCondition,
   FormatPointType,
   FormatStyleType,
   ConditionConfig,
-  DateFormatCondition,
+  DateCondition,
 } from './conditional-formatting/ConditionalRuleEditor';
 import ConditionalRowFormatEditor from './conditional-formatting/ConditionalRowFormatEditor';
 
@@ -116,144 +116,142 @@ export interface ConditionalFormattingEditorProps {
 
 const DEFAULT_CALLBACK = () => undefined;
 
-function getShortLabelForStringCondition(
-  condition: StringFormatCondition
-): string {
+function getShortLabelForStringCondition(condition: StringCondition): string {
   switch (condition) {
-    case StringFormatCondition.IS_EXACTLY:
+    case StringCondition.IS_EXACTLY:
       return '==';
-    case StringFormatCondition.IS_NOT_EXACTLY:
+    case StringCondition.IS_NOT_EXACTLY:
       return '!=';
-    case StringFormatCondition.CONTAINS:
+    case StringCondition.CONTAINS:
       return 'contains';
-    case StringFormatCondition.DOES_NOT_CONTAIN:
+    case StringCondition.DOES_NOT_CONTAIN:
       return 'does not contain';
-    case StringFormatCondition.STARTS_WITH:
+    case StringCondition.STARTS_WITH:
       return 'starts with';
-    case StringFormatCondition.ENDS_WITH:
+    case StringCondition.ENDS_WITH:
       return 'ends with';
   }
 }
 
-function getShortLabelForDateCondition(condition: DateFormatCondition): string {
+function getShortLabelForDateCondition(condition: DateCondition): string {
   switch (condition) {
-    case DateFormatCondition.IS_EXACTLY:
+    case DateCondition.IS_EXACTLY:
       return '==';
-    case DateFormatCondition.IS_NOT_EXACTLY:
+    case DateCondition.IS_NOT_EXACTLY:
       return '!=';
-    case DateFormatCondition.IS_BEFORE:
+    case DateCondition.IS_BEFORE:
       return '<';
-    case DateFormatCondition.IS_BEFORE_OR_EQUAL:
+    case DateCondition.IS_BEFORE_OR_EQUAL:
       return '<=';
-    case DateFormatCondition.IS_AFTER:
+    case DateCondition.IS_AFTER:
       return '>';
-    case DateFormatCondition.IS_AFTER_OR_EQUAL:
+    case DateCondition.IS_AFTER_OR_EQUAL:
       return '>=';
   }
 }
 
 export function getShortLabelForNumberCondition(
-  condition: NumberFormatCondition
+  condition: NumberCondition
 ): string {
   switch (condition) {
-    case NumberFormatCondition.IS_EQUAL:
+    case NumberCondition.IS_EQUAL:
       return '==';
-    case NumberFormatCondition.IS_NOT_EQUAL:
+    case NumberCondition.IS_NOT_EQUAL:
       return '!=';
-    case NumberFormatCondition.IS_BETWEEN:
+    case NumberCondition.IS_BETWEEN:
       return '==';
-    case NumberFormatCondition.GREATER_THAN:
+    case NumberCondition.GREATER_THAN:
       return '>';
-    case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
+    case NumberCondition.GREATER_THAN_OR_EQUAL:
       return '>=';
-    case NumberFormatCondition.LESS_THAN:
+    case NumberCondition.LESS_THAN:
       return '<';
-    case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+    case NumberCondition.LESS_THAN_OR_EQUAL:
       return '<=';
   }
 }
 
 export function getTextForNumberCondition(
   columnName: string,
-  condition: NumberFormatCondition,
+  condition: NumberCondition,
   value: unknown,
   start: unknown,
   end: unknown
 ): string {
   switch (condition) {
-    case NumberFormatCondition.IS_EQUAL:
+    case NumberCondition.IS_EQUAL:
       return `${columnName} == ${value}`;
-    case NumberFormatCondition.IS_NOT_EQUAL:
+    case NumberCondition.IS_NOT_EQUAL:
       return `${columnName} != ${value}`;
-    case NumberFormatCondition.IS_BETWEEN:
+    case NumberCondition.IS_BETWEEN:
       return `${columnName} > ${start} && ${columnName} < ${end}`;
-    case NumberFormatCondition.GREATER_THAN:
+    case NumberCondition.GREATER_THAN:
       return `${columnName} > ${value}`;
-    case NumberFormatCondition.GREATER_THAN_OR_EQUAL:
+    case NumberCondition.GREATER_THAN_OR_EQUAL:
       return `${columnName} >= ${value}`;
-    case NumberFormatCondition.LESS_THAN:
+    case NumberCondition.LESS_THAN:
       return `${columnName} < ${value}`;
-    case NumberFormatCondition.LESS_THAN_OR_EQUAL:
+    case NumberCondition.LESS_THAN_OR_EQUAL:
       return `${columnName} <= ${value}`;
   }
 }
 
 export function getTextForStringCondition(
   columnName: string,
-  condition: StringFormatCondition,
+  condition: StringCondition,
   value: unknown
 ): string {
   switch (condition) {
-    case StringFormatCondition.IS_EXACTLY:
+    case StringCondition.IS_EXACTLY:
       return `${columnName} == "${value}"`;
-    case StringFormatCondition.IS_NOT_EXACTLY:
+    case StringCondition.IS_NOT_EXACTLY:
       return `${columnName} != "${value}"`;
-    case StringFormatCondition.CONTAINS:
+    case StringCondition.CONTAINS:
       return `${columnName}.contains("${value}")`;
-    case StringFormatCondition.DOES_NOT_CONTAIN:
+    case StringCondition.DOES_NOT_CONTAIN:
       return `!${columnName}.contains("${value}")`;
-    case StringFormatCondition.STARTS_WITH:
+    case StringCondition.STARTS_WITH:
       return `${columnName}.startsWith("${value}")`;
-    case StringFormatCondition.ENDS_WITH:
+    case StringCondition.ENDS_WITH:
       return `${columnName}.endsWith("${value}")`;
   }
 }
 
 export function getTextForDateCondition(
   columnName: string,
-  condition: DateFormatCondition,
+  condition: DateCondition,
   value: unknown
 ): string {
   switch (condition) {
-    case DateFormatCondition.IS_EXACTLY:
+    case DateCondition.IS_EXACTLY:
       return `${columnName} == convertDateTime("${value}")`;
-    case DateFormatCondition.IS_NOT_EXACTLY:
+    case DateCondition.IS_NOT_EXACTLY:
       return `${columnName} != convertDateTime(\`${value}\`)`;
-    case DateFormatCondition.IS_BEFORE:
+    case DateCondition.IS_BEFORE:
       return `${columnName} < convertDateTime(\`${value}\`)`;
-    case DateFormatCondition.IS_BEFORE_OR_EQUAL:
+    case DateCondition.IS_BEFORE_OR_EQUAL:
       return `${columnName} <=  convertDateTime("${value}")`;
-    case DateFormatCondition.IS_AFTER:
+    case DateCondition.IS_AFTER:
       return `${columnName} > convertDateTime(\`${value}\`)`;
-    case DateFormatCondition.IS_AFTER_OR_EQUAL:
+    case DateCondition.IS_AFTER_OR_EQUAL:
       return `${columnName} >=  convertDateTime(\`${value}\`)`;
   }
 }
 
 export function getLabelForConditionType(
   columnType: string,
-  condition: StringFormatCondition | NumberFormatCondition | DateFormatCondition
+  condition: StringCondition | NumberCondition | DateCondition
 ): string {
   if (TableUtils.isNumberType(columnType)) {
-    return getShortLabelForNumberCondition(condition as NumberFormatCondition);
+    return getShortLabelForNumberCondition(condition as NumberCondition);
   }
 
   if (TableUtils.isTextType(columnType)) {
-    return getShortLabelForStringCondition(condition as StringFormatCondition);
+    return getShortLabelForStringCondition(condition as StringCondition);
   }
 
   if (TableUtils.isDateType(columnType)) {
-    return getShortLabelForDateCondition(condition as DateFormatCondition);
+    return getShortLabelForDateCondition(condition as DateCondition);
   }
 
   throw new Error('Invalid column type');
@@ -280,11 +278,11 @@ function getFormatterTypeLabel(option: FormatterType): string {
 
 function getDefaultConditionForType(
   columnType: string | undefined
-): NumberFormatCondition | StringFormatCondition {
+): NumberCondition | StringCondition {
   // TODO: other types
   return TableUtils.isNumberType(columnType)
-    ? NumberFormatCondition.IS_EQUAL
-    : StringFormatCondition.IS_EXACTLY;
+    ? NumberCondition.IS_EQUAL
+    : StringCondition.IS_EXACTLY;
 }
 
 function makeDefaultRule(columns: ModelColumn[]): FormattingRule {
