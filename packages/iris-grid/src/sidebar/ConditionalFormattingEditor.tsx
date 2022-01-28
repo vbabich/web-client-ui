@@ -4,27 +4,28 @@ import { Button } from '@deephaven/components';
 import Log from '@deephaven/log';
 import { FormatColumnWhereIcon, FormatRowWhereIcon } from './icons';
 import { TableUtils } from '..';
-
-import './ConditionalFormattingEditor.scss';
 import ConditionalRuleEditor, {
+  ConditionConfig,
+} from './conditional-formatting/ConditionalRuleEditor';
+import ConditionalRowFormatEditor, {
+  RowFormatConfig,
+} from './conditional-formatting/ConditionalRowFormatEditor';
+import {
+  DateCondition,
+  FormatStyleType,
+  getDefaultConditionForType,
   NumberCondition,
   StringCondition,
-  FormatPointType,
-  FormatStyleType,
-  ConditionConfig,
-  DateCondition,
-} from './conditional-formatting/ConditionalRuleEditor';
-import ConditionalRowFormatEditor from './conditional-formatting/ConditionalRowFormatEditor';
+} from './conditional-formatting/ConditionalFormattingUtils';
+import './ConditionalFormattingEditor.scss';
 
 const log = Log.module('ConditionalFormattingEditor');
 
-export type ConditionalFormattingSaveCallback = (rule: FormattingRule) => void;
+export type SaveCallback = (rule: FormattingRule) => void;
 
-export type ConditionalFormattingCancelCallback = () => void;
+export type CancelCallback = () => void;
 
-export type FormattingRuleEditorChangeCallback = (
-  ruleConfig: ConditionConfig
-) => void;
+export type ChangeCallback = (ruleConfig: ConditionConfig) => void;
 
 export interface ModelColumn {
   name: string;
@@ -36,18 +37,6 @@ export enum FormatterType {
   ROWS = 'rows',
 }
 
-export enum ColorScaleType {
-  STANDARD = 'standard',
-  WARM = 'warm',
-  COOL = 'cool',
-
-  TRAFFIC = 'traffic',
-  DIVERGING = 'diverging',
-
-  COLORBLIND = 'colorblind',
-  UNIQUE = 'unique',
-}
-
 export interface FormatStyleConfig {
   type: FormatStyleType;
   customConfig?: {
@@ -55,63 +44,19 @@ export interface FormatStyleConfig {
     background: string;
   };
 }
-export interface AdvancedConditionConfig {
-  column: ModelColumn;
-  condition: string;
-  style: FormatStyleConfig;
-}
-
-export interface ProgressConfig {
-  column: ModelColumn;
-  style: FormatStyleConfig;
-  startType: FormatPointType;
-  endType: FormatPointType;
-  // Optional depending on point type
-  start?: number;
-  end?: number;
-}
-
-export interface ColorScaleConfig {
-  column: ModelColumn;
-  // TODO: heatmap on non-number columns?
-  // TODO: only show numeric columns in the selector?
-  scale: ColorScaleType;
-  startType: FormatPointType;
-  // Optional depending on the scale
-  midType?: FormatPointType;
-  endType: FormatPointType;
-  // Optional depending on point type
-  start?: number;
-  mid?: number;
-  end?: number;
-}
-
-// Same fields as in ConditionConfig for now
-export type RowsConfig = ConditionConfig;
-
-export interface ConditionalFormattingRule {
-  type: FormatterType;
-  column: ModelColumn;
-  config: ConditionConfig;
-}
 
 export interface FormattingRule {
   type: FormatterType;
-  config:
-    | ConditionConfig
-    | AdvancedConditionConfig
-    | ProgressConfig
-    | ColorScaleConfig
-    | RowsConfig;
+  config: ConditionConfig | RowFormatConfig;
 }
 
 export interface ConditionalFormattingEditorProps {
   columns: ModelColumn[];
   rule?: FormattingRule;
   disableCancel?: boolean;
-  onCancel?: ConditionalFormattingCancelCallback;
-  onSave?: ConditionalFormattingSaveCallback;
-  onUpdate?: ConditionalFormattingSaveCallback;
+  onCancel?: CancelCallback;
+  onSave?: SaveCallback;
+  onUpdate?: SaveCallback;
 }
 
 const DEFAULT_CALLBACK = () => undefined;
@@ -274,15 +219,6 @@ function getFormatterTypeLabel(option: FormatterType): string {
     case FormatterType.ROWS:
       return 'Rows';
   }
-}
-
-function getDefaultConditionForType(
-  columnType: string | undefined
-): NumberCondition | StringCondition {
-  // TODO: other types
-  return TableUtils.isNumberType(columnType)
-    ? NumberCondition.IS_EQUAL
-    : StringCondition.IS_EXACTLY;
 }
 
 function makeDefaultRule(columns: ModelColumn[]): FormattingRule {

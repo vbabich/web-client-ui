@@ -5,13 +5,46 @@ import {
   getTextForNumberCondition,
   getTextForStringCondition,
 } from '../ConditionalFormattingEditor';
-import {
-  ConditionConfig,
-  DateCondition,
-  FormatStyleType,
-  NumberCondition,
-  StringCondition,
-} from './ConditionalRuleEditor';
+import { ConditionConfig } from './ConditionalRuleEditor';
+
+export enum NumberCondition {
+  IS_EQUAL = 'is-equal',
+  IS_NOT_EQUAL = 'is-not-equal',
+  IS_BETWEEN = 'is-between',
+  GREATER_THAN = 'greater-than',
+  GREATER_THAN_OR_EQUAL = 'greater-than-or-equal',
+  LESS_THAN = 'less-than',
+  LESS_THAN_OR_EQUAL = 'less-than-or-equal',
+}
+
+export enum StringCondition {
+  IS_EXACTLY = 'is-exactly',
+  IS_NOT_EXACTLY = 'is-not-exactly',
+  CONTAINS = 'contains',
+  DOES_NOT_CONTAIN = 'does-not-contain',
+  STARTS_WITH = 'starts-with',
+  ENDS_WITH = 'ends-with',
+}
+
+export enum DateCondition {
+  IS_EXACTLY = 'is-exactly',
+  IS_NOT_EXACTLY = 'is-not-exactly',
+  IS_BEFORE = 'is-before',
+  IS_BEFORE_OR_EQUAL = 'is-before-or-equal',
+  IS_AFTER = 'is-after',
+  IS_AFTER_OR_EQUAL = 'is-after-or-equal',
+}
+
+export enum FormatStyleType {
+  NO_FORMATTING = 'no-formatting',
+  POSITIVE = 'positive',
+  NEGATIVE = 'negative',
+  WARN = 'warn',
+  NEUTRAL = 'neutral',
+  ACCENT_1 = 'accent-1',
+  ACCENT_2 = 'accent-2',
+  CUSTOM = 'custom',
+}
 
 export function getLabelForStyleType(option: FormatStyleType): string {
   switch (option) {
@@ -135,6 +168,77 @@ export function getConditionText(config: ConditionConfig): string {
 
   if (TableUtils.isDateType(column.type)) {
     return getDateConditionText(config);
+  }
+
+  throw new Error('Invalid column type');
+}
+
+export function getLabelForNumberCondition(condition: NumberCondition): string {
+  switch (condition) {
+    case NumberCondition.IS_EQUAL:
+      return 'Is equal to';
+    case NumberCondition.IS_NOT_EQUAL:
+      return 'Is not equal to';
+    case NumberCondition.IS_BETWEEN:
+      return 'Is between';
+    case NumberCondition.GREATER_THAN:
+      return 'Greater than';
+    case NumberCondition.GREATER_THAN_OR_EQUAL:
+      return 'Greater than or equal to';
+    case NumberCondition.LESS_THAN:
+      return 'Less than';
+    case NumberCondition.LESS_THAN_OR_EQUAL:
+      return 'Less than or equal to';
+  }
+}
+
+export function getLabelForStringCondition(condition: StringCondition): string {
+  switch (condition) {
+    case StringCondition.IS_EXACTLY:
+      return 'Is exactly';
+    case StringCondition.IS_NOT_EXACTLY:
+      return 'Is not exactly';
+    case StringCondition.CONTAINS:
+      return 'Contains';
+    case StringCondition.DOES_NOT_CONTAIN:
+      return 'Does not contain';
+    case StringCondition.STARTS_WITH:
+      return 'Starts with';
+    case StringCondition.ENDS_WITH:
+      return 'Ends with';
+  }
+}
+
+export function getLabelForDateCondition(condition: DateCondition): string {
+  switch (condition) {
+    case DateCondition.IS_EXACTLY:
+      return 'Is';
+    case DateCondition.IS_NOT_EXACTLY:
+      return 'Is not';
+    case DateCondition.IS_BEFORE:
+      return 'Is before';
+    case DateCondition.IS_BEFORE_OR_EQUAL:
+      return 'Is before or equal';
+    case DateCondition.IS_AFTER:
+      return 'Is after';
+    case DateCondition.IS_AFTER_OR_EQUAL:
+      return 'Is after or equal';
+  }
+}
+
+export function getDefaultConditionForType(
+  columnType: string | undefined
+): NumberCondition | StringCondition | DateCondition {
+  if (TableUtils.isNumberType(columnType)) {
+    return NumberCondition.IS_EQUAL;
+  }
+
+  if (TableUtils.isTextType(columnType)) {
+    return StringCondition.IS_EXACTLY;
+  }
+
+  if (TableUtils.isDateType(columnType)) {
+    return DateCondition.IS_EXACTLY;
   }
 
   throw new Error('Invalid column type');

@@ -12,13 +12,11 @@ import {
 } from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
-import {
-  ConditionConfig,
-  NumberCondition,
-} from './conditional-formatting/ConditionalRuleEditor';
+import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
 import {
   getBackgroundForStyleConfig,
   getColorForStyleConfig,
+  NumberCondition,
 } from './conditional-formatting/ConditionalFormattingUtils';
 import { TableUtils } from '..';
 
