@@ -3,7 +3,7 @@ import Log from '@deephaven/log';
 import { ColorUtils } from '@deephaven/utils';
 import { ComboBox } from '@deephaven/components';
 import { TableUtils } from '../..';
-import { ChangeCallback } from '../ConditionalFormattingEditor';
+import { ChangeCallback } from '../ConditionalFormatEditor';
 import {
   DateCondition,
   FormatStyleConfig,

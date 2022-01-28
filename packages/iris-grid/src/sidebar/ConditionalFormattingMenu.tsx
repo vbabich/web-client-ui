@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { dhNewCircleLargeFilled, vsGripper, vsTrash } from '@deephaven/icons';
 import { Button, DragUtils, Tooltip } from '@deephaven/components';
 import Log from '@deephaven/log';
-import { FormatterType, FormattingRule } from './ConditionalFormattingEditor';
+import { FormatterType, FormattingRule } from './ConditionalFormatEditor';
 
 import './ConditionalFormattingMenu.scss';
 import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';

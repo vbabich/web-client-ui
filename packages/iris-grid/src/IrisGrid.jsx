@@ -92,9 +92,9 @@ import {
   getConditionText,
   getDBStringForStyleConfig,
 } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
-import ConditionalFormattingEditor, {
+import ConditionalFormatEditor, {
   FormatterType,
-} from './sidebar/ConditionalFormattingEditor';
+} from './sidebar/ConditionalFormatEditor';
 
 const log = Log.module('IrisGrid');
 
@@ -2903,7 +2903,7 @@ export class IrisGrid extends Component {
           );
         case OptionType.CONDITIONAL_FORMATTING_EDIT:
           return (
-            <ConditionalFormattingEditor
+            <ConditionalFormatEditor
               columns={model.columns}
               rule={conditionalFormatPreview}
               onUpdate={this.handleConditionalFormatEditorUpdate}
