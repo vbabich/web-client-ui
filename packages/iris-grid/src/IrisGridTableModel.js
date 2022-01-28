@@ -194,7 +194,6 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   handleCustomColumnsChanged() {
-    // TODO: formatcolumns changed?
     this.dispatchEvent(
       new CustomEvent(IrisGridModel.EVENT.COLUMNS_CHANGED, {
         detail: this.columns,
@@ -837,43 +836,31 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   get customColumns() {
-    // TODO: filter to only include non-format columns
-    // this.customColumnList ??
-    return (this.table.customColumns ?? []).filter(column => {
-      log.debug('filter', column);
-      return column;
-    });
+    return this.customColumnList ?? [];
   }
 
   set customColumns(customColumns) {
     if (deepEqual(customColumns, this.customColumnList)) {
-      log.debug('customColumns - ignore same columns');
+      log.debug('Ignore same customColumns');
       return;
     }
     this.closeSubscription();
     this.customColumnList = customColumns;
-    log.debug('customColumns - apply', customColumns);
     this.table.applyCustomColumns([...customColumns, ...this.formatColumnList]);
     this.applyViewport();
   }
 
   get formatColumns() {
-    // TODO: filter to only include format columns
-    // this.formatColumnList ??
-    return (this.table.customColumns ?? []).filter(column => {
-      log.debug('filter', column);
-      return column;
-    });
+    return this.formatColumnList;
   }
 
   set formatColumns(formatColumns) {
     if (deepEqual(formatColumns, this.formatColumnList)) {
-      log.debug('formatColumns - ignore same columns');
+      log.debug('Ignore same formatColumns');
       return;
     }
     this.closeSubscription();
     this.formatColumnList = formatColumns;
-    log.debug('formatColumns - apply', formatColumns);
     this.table.applyCustomColumns([...this.customColumnList, ...formatColumns]);
     this.applyViewport();
   }
@@ -1252,8 +1239,7 @@ class IrisGridTableModel extends IrisGridModel {
   }
 
   isColumnFrozen(x) {
-    return false;
-    // return this.frozenColumns.includes(this.columns[x].name);
+    return this.frozenColumns.includes(this.columns[x].name);
   }
 
   isKeyColumn(x) {

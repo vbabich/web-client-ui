@@ -186,11 +186,16 @@ class IrisGridModel extends GridModel {
     throw new Error('set customColumns not implemented');
   }
 
-  // TODO: jsdoc
+  /**
+   * @returns {String[]} The format columns on this model
+   */
   get formatColumns() {
     throw new Error('get formatColumns not implemented');
   }
 
+  /**
+   * @param {String[]} formatColumns The format columns to use
+   */
   set formatColumns(formatColumns) {
     throw new Error('set formatColumns not implemented');
   }
