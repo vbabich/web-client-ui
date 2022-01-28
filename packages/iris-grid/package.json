@@ -1,6 +1,6 @@
 {
   "name": "@deephaven/iris-grid",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Deephaven Iris Grid",
   "author": "Deephaven Data Labs LLC",
   "license": "Apache-2.0",
@@ -16,29 +16,24 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "cross-env NODE_ENV=production run-s clean build-steps",
-    "build-dev": "cross-env NODE_ENV=development run-s clean build-steps",
-    "build-steps": "run-p build:*",
-    "babel": "babel ./src --out-dir ./dist --extensions \".ts,.tsx,.js,.jsx\" --source-maps --root-mode upward --verbose",
+    "build": "cross-env NODE_ENV=production run-p build:*",
+    "build-dev": "cross-env NODE_ENV=development run-p build:*",
+    "babel": "babel ./src --out-dir ./dist --extensions \".ts,.tsx,.js,.jsx\" --source-maps --root-mode upward",
     "sass": "sass ./src:./dist",
-    "types": "tsc",
     "build:babel": "npm run babel",
     "build:sass": "npm run sass",
-    "build:types": "npm run types -- --incremental",
     "watch": "run-p watch:*",
     "watch:babel": "npm run babel -- -w --skip-initial-build",
     "watch:sass": "npm run sass -- --watch --update",
-    "watch:types": "npm run types -- -w --incremental --preserveWatchOutput",
-    "clean": "rimraf ./dist tsconfig.tsbuildinfo",
     "prestart": "npm run build-dev",
     "start": "cross-env NODE_ENV=development npm run watch"
   },
   "dependencies": {
-    "@deephaven/grid": "^0.8.0",
-    "@deephaven/icons": "^0.8.0",
-    "@deephaven/jsapi-shim": "^0.8.1",
-    "@deephaven/react-hooks": "^0.8.0",
-    "@deephaven/utils": "^0.8.0",
+    "@deephaven/grid": "^0.9.0",
+    "@deephaven/icons": "^0.9.0",
+    "@deephaven/jsapi-shim": "^0.9.0",
+    "@deephaven/react-hooks": "^0.9.0",
+    "@deephaven/utils": "^0.9.0",
     "@fortawesome/react-fontawesome": "^0.1.12",
     "classnames": "^2.3.1",
     "deep-equal": "^2.0.4",
@@ -61,10 +56,10 @@
   },
   "devDependencies": {
     "@babel/cli": "^7.16.0",
-    "@deephaven/components": "^0.8.0",
-    "@deephaven/log": "^0.8.0",
-    "@deephaven/mocks": "^0.8.0",
-    "@deephaven/tsconfig": "^0.8.0",
+    "@deephaven/components": "^0.9.0",
+    "@deephaven/log": "^0.9.0",
+    "@deephaven/mocks": "^0.9.0",
+    "@deephaven/tsconfig": "^0.9.0",
     "@svgr/cli": "^5.5.0",
     "@types/react": "^16.14.8",
     "@types/react-dom": "^16.9.13",
@@ -74,8 +69,7 @@
     "npm-run-all": "^4.1.5",
     "react": "^16.14.0",
     "rimraf": "^3.0.2",
-    "sass": "1.32.13",
-    "typescript": "~4.3.2"
+    "sass": "1.32.13"
   },
   "files": [
     "dist"

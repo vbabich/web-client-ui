@@ -838,6 +838,7 @@ export class IrisGridPanel extends PureComponent {
       user,
       workspace,
       settings,
+      theme,
     } = this.props;
     const {
       advancedFilters,
@@ -959,6 +960,7 @@ export class IrisGridPanel extends PureComponent {
             ref={this.irisGrid}
             getDownloadWorker={getDownloadWorker}
             frozenColumns={frozenColumns}
+            theme={theme}
           >
             {childrenContent}
           </IrisGrid>
@@ -1010,6 +1012,8 @@ IrisGridPanel.propTypes = {
 
   // Load a plugin defined by the table
   loadPlugin: PropTypes.func,
+
+  theme: PropTypes.shape({}),
 };
 
 IrisGridPanel.defaultProps = {
@@ -1020,6 +1024,7 @@ IrisGridPanel.defaultProps = {
   onPanelStateUpdate: () => {},
   getDownloadWorker: undefined,
   loadPlugin: undefined,
+  theme: undefined,
 };
 
 IrisGridPanel.displayName = 'IrisGridPanel';

@@ -1,6 +1,6 @@
 {
   "name": "@deephaven/storage",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Deephaven Storage abstract classes for storing app data",
   "author": "Deephaven Data Labs LLC",
   "license": "Apache-2.0",
@@ -16,22 +16,17 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "cross-env NODE_ENV=production run-s clean build-steps",
-    "build-dev": "cross-env NODE_ENV=development run-s clean build-steps",
-    "build-steps": "run-p build:*",
+    "build": "cross-env NODE_ENV=production run-p build:*",
+    "build-dev": "cross-env NODE_ENV=development run-p build:*",
     "babel": "babel ./src --out-dir ./dist --extensions \".ts,.tsx,.js,.jsx\" --source-maps --root-mode upward",
-    "types": "tsc",
     "build:babel": "npm run babel",
-    "build:types": "npm run types -- --incremental",
     "watch": "run-p watch:*",
     "watch:babel": "npm run babel -- -w --skip-initial-build",
-    "watch:types": "npm run types -- -w --incremental --preserveWatchOutput",
-    "clean": "rimraf ./dist tsconfig.tsbuildinfo",
     "prestart": "npm run build-dev",
     "start": "cross-env NODE_ENV=development npm run watch"
   },
   "dependencies": {
-    "@deephaven/iris-grid": "^0.8.1",
+    "@deephaven/iris-grid": "^0.9.0",
     "lodash.throttle": "^4.1.1"
   },
   "peerDependencies": {
@@ -40,14 +35,13 @@
   },
   "devDependencies": {
     "@babel/cli": "^7.16.0",
-    "@deephaven/log": "^0.8.0",
-    "@deephaven/tsconfig": "^0.8.0",
+    "@deephaven/log": "^0.9.0",
+    "@deephaven/tsconfig": "^0.9.0",
     "@types/lodash.throttle": "^4.1.1",
     "cross-env": "^7.0.2",
     "npm-run-all": "^4.1.5",
     "react": "^16.14.0",
-    "rimraf": "^3.0.2",
-    "typescript": "~4.3.2"
+    "rimraf": "^3.0.2"
   },
   "files": [
     "dist"

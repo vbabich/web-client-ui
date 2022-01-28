@@ -551,7 +551,9 @@ export class IrisGrid extends Component {
       toggleFilterBarAction,
       toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar
+      showSearchBar,
+      canDownloadCsv,
+      canToggleSearch
     ) => {
       const optionItems = [];
       if (isChartBuilderAvailable) {
@@ -621,14 +623,16 @@ export class IrisGrid extends Component {
         isOn: isFilterBarShown,
         onChange: toggleFilterBarAction.action,
       });
-      optionItems.push({
-        type: OptionType.SEARCH_BAR,
-        title: 'Search Bar',
-        subtitle: toggleSearchBarAction.shortcut.getDisplayText(),
-        icon: vsSearch,
-        isOn: showSearchBar,
-        onChange: toggleSearchBarAction.action,
-      });
+      if (canToggleSearch) {
+        optionItems.push({
+          type: OptionType.SEARCH_BAR,
+          title: 'Search Bar',
+          subtitle: toggleSearchBarAction.shortcut.getDisplayText(),
+          icon: vsSearch,
+          isOn: showSearchBar,
+          onChange: toggleSearchBarAction.action,
+        });
+      }
 
       return optionItems;
     },
@@ -1662,6 +1666,9 @@ export class IrisGrid extends Component {
 
   toggleSearchBar() {
     const { showSearchBar } = this.state;
+    const { canToggleSearch } = this.props;
+    if (!canToggleSearch) return;
+
     const update = !showSearchBar;
     this.setState(
       {
@@ -2403,6 +2410,8 @@ export class IrisGrid extends Component {
       alwaysFetchColumns,
       advancedSettings,
       onAdvancedSettingsChange,
+      canDownloadCsv,
+      canToggleSearch,
     } = this.props;
     const {
       metricCalculator,
@@ -2866,7 +2875,9 @@ export class IrisGrid extends Component {
       this.toggleFilterBarAction,
       this.toggleSearchBarAction,
       isFilterBarShown,
-      showSearchBar
+      showSearchBar,
+      canDownloadCsv,
+      canToggleSearch
     );
 
     const openOptionsStack = openOptions.map(option => {
@@ -3297,6 +3308,15 @@ IrisGrid.propTypes = {
 
   pendingDataMap: PropTypes.instanceOf(Map),
   getDownloadWorker: PropTypes.func,
+
+  canCopy: PropTypes.bool,
+  canDownloadCsv: PropTypes.bool,
+  frozenColumns: PropTypes.arrayOf(PropTypes.string),
+
+  // Theme override for IrisGridTheme
+  theme: PropTypes.shape({}),
+
+  canToggleSearch: PropTypes.bool,
 };
 
 IrisGrid.defaultProps = {
@@ -3352,6 +3372,11 @@ IrisGrid.defaultProps = {
     showTSeparator: true,
     formatter: [],
   },
+  canCopy: true,
+  canDownloadCsv: true,
+  frozenColumns: null,
+  theme: {},
+  canToggleSearch: true,
 };
 
 export default IrisGrid;
