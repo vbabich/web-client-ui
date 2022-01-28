@@ -156,7 +156,7 @@ const ColumnFormatEditor = (props: ColumnFormatEditorProps): JSX.Element => {
   }, [selectedColumnType]);
 
   const handleColumnChange = useCallback(
-    value => {
+    (value: string) => {
       const newColumn = columns.find(({ name }) => name === value);
       if (newColumn && selectedColumnType !== newColumn.type) {
         log.debug('handleColumnChange', selectedColumnType, newColumn.type);
@@ -270,7 +270,10 @@ const ColumnFormatEditor = (props: ColumnFormatEditorProps): JSX.Element => {
   ]);
 
   const conditionInputs = useMemo(() => {
-    if (TableUtils.isNumberType(selectedColumnType)) {
+    if (
+      selectedColumnType !== undefined &&
+      TableUtils.isNumberType(selectedColumnType)
+    ) {
       switch (selectedCondition) {
         case NumberCondition.IS_EQUAL:
         case NumberCondition.IS_NOT_EQUAL:
@@ -309,7 +312,10 @@ const ColumnFormatEditor = (props: ColumnFormatEditorProps): JSX.Element => {
             </div>
           );
       }
-    } else if (TableUtils.isTextType(selectedColumnType)) {
+    } else if (
+      selectedColumnType !== undefined &&
+      TableUtils.isTextType(selectedColumnType)
+    ) {
       return (
         <input
           type="text"
@@ -319,7 +325,10 @@ const ColumnFormatEditor = (props: ColumnFormatEditorProps): JSX.Element => {
           onChange={handleValueChange}
         />
       );
-    } else if (TableUtils.isDateType(selectedColumnType)) {
+    } else if (
+      selectedColumnType !== undefined &&
+      TableUtils.isDateType(selectedColumnType)
+    ) {
       return (
         <input
           type="text"

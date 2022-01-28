@@ -234,7 +234,7 @@ export function getLabelForDateCondition(condition: DateCondition): string {
 }
 
 export function getDefaultConditionForType(
-  columnType: string | undefined
+  columnType: string
 ): NumberCondition | StringCondition | DateCondition {
   if (TableUtils.isNumberType(columnType)) {
     return NumberCondition.IS_EQUAL;

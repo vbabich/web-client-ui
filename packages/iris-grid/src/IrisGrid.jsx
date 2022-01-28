@@ -2014,9 +2014,7 @@ export class IrisGrid extends Component {
 
   handleConditionalFormatsChange(conditionalFormats) {
     log.debug('Updated conditional formats', conditionalFormats);
-    // Reset conditionalFormatPreview here so the editor opens with a blank rule
-    // if there's no rules left
-    this.setState({ conditionalFormats, conditionalFormatPreview: undefined });
+    this.setState({ conditionalFormats });
   }
 
   handleConditionalFormatCreate() {

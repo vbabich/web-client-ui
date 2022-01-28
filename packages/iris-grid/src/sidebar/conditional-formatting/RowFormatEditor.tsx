@@ -270,7 +270,10 @@ const RowFormatEditor = (props: RowFormatEditorProps): JSX.Element => {
   ]);
 
   const conditionInputs = useMemo(() => {
-    if (TableUtils.isNumberType(selectedColumnType)) {
+    if (
+      selectedColumnType !== undefined &&
+      TableUtils.isNumberType(selectedColumnType)
+    ) {
       switch (selectedCondition) {
         case NumberCondition.IS_EQUAL:
         case NumberCondition.IS_NOT_EQUAL:
@@ -309,7 +312,10 @@ const RowFormatEditor = (props: RowFormatEditorProps): JSX.Element => {
             </div>
           );
       }
-    } else if (TableUtils.isTextType(selectedColumnType)) {
+    } else if (
+      selectedColumnType !== undefined &&
+      TableUtils.isTextType(selectedColumnType)
+    ) {
       return (
         <input
           type="text"
@@ -319,7 +325,10 @@ const RowFormatEditor = (props: RowFormatEditorProps): JSX.Element => {
           onChange={handleValueChange}
         />
       );
-    } else if (TableUtils.isDateType(selectedColumnType)) {
+    } else if (
+      selectedColumnType !== undefined &&
+      TableUtils.isDateType(selectedColumnType)
+    ) {
       return (
         <input
           type="text"
