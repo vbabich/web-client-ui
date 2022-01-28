@@ -1,5 +1,5 @@
 import { TableUtils } from '../..';
-import { ConditionConfig } from './ConditionalRuleEditor';
+import { ConditionConfig } from './ColumnFormatEditor';
 
 export type ModelColumn = {
   name: string;

@@ -87,14 +87,14 @@ import AdvancedSettingsType from './sidebar/AdvancedSettingsType';
 import AdvancedSettingsMenu from './sidebar/AdvancedSettingsMenu';
 import SHORTCUTS from './IrisGridShortcuts';
 import DateUtils from './DateUtils';
-import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
+import ConditionalFormattingMenu from './sidebar/conditional-formatting/ConditionalFormattingMenu';
 import {
   getConditionText,
   getDBStringForStyleConfig,
 } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
 import ConditionalFormatEditor, {
   FormatterType,
-} from './sidebar/ConditionalFormatEditor';
+} from './sidebar/conditional-formatting/ConditionalFormatEditor';
 
 const log = Log.module('IrisGrid');
 
