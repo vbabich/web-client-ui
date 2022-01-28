@@ -76,7 +76,9 @@ const IrisGridModelUpdater = React.memo(
       }
     }, [model, customColumns]);
     useEffect(() => {
-      model.formatColumns = formatColumns;
+      if (model.isConditionalFormatsAvailable) {
+        model.formatColumns = formatColumns;
+      }
     }, [model, formatColumns]);
     useEffect(() => {
       model.setViewport(top, bottom, columns);

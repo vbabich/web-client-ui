@@ -90,7 +90,7 @@ import DateUtils from './DateUtils';
 import ConditionalFormattingMenu from './sidebar/ConditionalFormattingMenu';
 import {
   getConditionText,
-  getTextForStyleConfig,
+  getDBStringForStyleConfig,
 } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
 import ConditionalFormattingEditor, {
   FormatterType,
@@ -101,6 +101,8 @@ const log = Log.module('IrisGrid');
 const UPDATE_DOWNLOAD_THROTTLE = 500;
 
 const SET_FILTER_DEBOUNCE = 250;
+
+const SET_CONDITIONAL_FORMAT_DEBOUNCE = 250;
 
 function isEmptyConfig({
   advancedFilters,
@@ -184,8 +186,9 @@ export class IrisGrid extends Component {
     this.handleConditionalFormatEditorSave = this.handleConditionalFormatEditorSave.bind(
       this
     );
-    this.handleConditionalFormatEditorUpdate = this.handleConditionalFormatEditorUpdate.bind(
-      this
+    this.handleConditionalFormatEditorUpdate = debounce(
+      this.handleConditionalFormatEditorUpdate.bind(this),
+      SET_CONDITIONAL_FORMAT_DEBOUNCE
     );
     this.handleConditionalFormatEditorCancel = this.handleConditionalFormatEditorCancel.bind(
       this
@@ -382,7 +385,8 @@ export class IrisGrid extends Component {
       customColumnFormatMap: new Map(customColumnFormatMap),
 
       conditionalFormats,
-      conditionalFormatIndex: undefined,
+      conditionalFormatEditIndex: undefined,
+      conditionalFormatPreview: undefined,
 
       // Column user is hovering over for selection
       hoverSelectColumn: null,
@@ -539,6 +543,7 @@ export class IrisGrid extends Component {
     (
       isChartBuilderAvailable,
       isCustomColumnsAvailable,
+      isConditionalFormatsAvailable,
       isRollupAvailable,
       isTotalsAvailable,
       isSelectDistinctAvailable,
@@ -561,11 +566,13 @@ export class IrisGrid extends Component {
         title: 'Column Visibility & Ordering',
         icon: dhEye,
       });
-      optionItems.push({
-        type: OptionType.CONDITIONAL_FORMATTING,
-        title: 'Conditional Formatting',
-        icon: vsEdit,
-      });
+      if (isConditionalFormatsAvailable) {
+        optionItems.push({
+          type: OptionType.CONDITIONAL_FORMATTING,
+          title: 'Conditional Formatting',
+          icon: vsEdit,
+        });
+      }
       if (isCustomColumnsAvailable) {
         optionItems.push({
           type: OptionType.CUSTOM_COLUMN_BUILDER,
@@ -670,13 +677,16 @@ export class IrisGrid extends Component {
       .filter(o => !AggregationUtils.isRollupOperation(o))
   );
 
-  getFormatColumns = memoize((columns, rules) => {
-    log.debug('getFormatColumns', columns, rules);
+  getFormatColumns = memoize((columns, rulesParam, preview, editIndex) => {
+    log.debug('getFormatColumns', columns, rulesParam, preview, editIndex);
     const result = [];
     const formatColumnMap = new Map();
     const formatRowMap = new Map();
+    const rules = [...rulesParam];
+    if (preview !== undefined && editIndex !== undefined) {
+      rules[editIndex] = preview;
+    }
     rules.forEach(({ config, type: formatterType }) => {
-      // TODO: depends on formatter type, ROWS might have no columns property
       const { column } = config;
       // Check both name and type because the type can change
       const col = columns.find(
@@ -685,7 +695,7 @@ export class IrisGrid extends Component {
       if (formatterType === FormatterType.ROWS) {
         const { rule: prevRule = null, index = undefined } =
           formatRowMap.get(col.name) ?? {};
-        const rule = `${getConditionText(config)} ? ${getTextForStyleConfig(
+        const rule = `${getConditionText(config)} ? ${getDBStringForStyleConfig(
           config.style
         )} : ${prevRule}`;
         const formatRow = dh.Column.formatRowColor(rule);
@@ -696,6 +706,7 @@ export class IrisGrid extends Component {
         formatRowMap.set(col.name, { rule, index: result.length - 1 });
         return;
       }
+      // FormatterType.CONDITIONAL
       if (!col) {
         log.debug(
           `Column ${column.name}:${column.type} not found. Ignoring format rule`,
@@ -705,7 +716,7 @@ export class IrisGrid extends Component {
       }
       const { rule: prevRule = null, index = undefined } =
         formatColumnMap.get(col.name) ?? {};
-      const rule = `${getConditionText(config)} ? ${getTextForStyleConfig(
+      const rule = `${getConditionText(config)} ? ${getDBStringForStyleConfig(
         config.style
       )} : ${prevRule}`;
       const formatColumn = col.formatColor(rule);
@@ -1996,9 +2007,9 @@ export class IrisGrid extends Component {
 
   handleConditionalFormatsChange(conditionalFormats) {
     log.debug('Updated conditional formats', conditionalFormats);
-    // TODO: only show spinner if the formats are actually different
-    // this.startLoading('Applying conditional formats...');
-    this.setState({ conditionalFormats });
+    // Reset conditionalFormatPreview here so the editor opens with a blank rule
+    // if there's no rules left
+    this.setState({ conditionalFormats, conditionalFormatPreview: undefined });
   }
 
   handleConditionalFormatCreate() {
@@ -2012,8 +2023,9 @@ export class IrisGrid extends Component {
           title: `Create Formatting Rule`,
         },
       ],
-      conditionalFormatIndex: conditionalFormats.length,
-      prevConditionalFormat: undefined,
+      conditionalFormatEditIndex: conditionalFormats.length,
+      // Start with a blank rule
+      conditionalFormatPreview: undefined,
     });
   }
 
@@ -2028,67 +2040,40 @@ export class IrisGrid extends Component {
           title: `Edit Formatting Rule`,
         },
       ],
-      conditionalFormatIndex: index,
-      // Save existing rule in case we need to cancel changes later
-      prevConditionalFormat: conditionalFormats[index],
+      conditionalFormatEditIndex: index,
+      // Clone rule to preview temporary changes
+      conditionalFormatPreview: { ...conditionalFormats[index] },
     });
   }
 
   // Apply live changes
-  handleConditionalFormatEditorUpdate(config) {
-    // TODO: only start loading of the config is actually different
-    // otherwise the spinner won't get the update event and won't stop
-    // this.startLoading('Applying conditional formats...');
-    this.setState(state => {
-      if (state.conditionalFormatIndex === undefined) {
-        log.debug('Invalid format index');
-        return null;
-      }
-      const conditionalFormats = [...state.conditionalFormats];
-      conditionalFormats[state.conditionalFormatIndex] = config;
-      return { conditionalFormats };
-    });
+  handleConditionalFormatEditorUpdate(conditionalFormatPreview) {
+    this.setState({ conditionalFormatPreview });
   }
 
   handleConditionalFormatEditorSave(config) {
     log.debug('Save conditional format changes', config);
-    this.startLoading('Applying conditional formats...');
-    this.setState(state => {
-      if (state.conditionalFormatIndex === undefined) {
-        log.debug('Invalid format index');
-        return null;
+    this.setState(
+      state => {
+        if (state.conditionalFormatEditIndex === undefined) {
+          log.debug('Invalid format index');
+          return null;
+        }
+        const conditionalFormats = [...state.conditionalFormats];
+        conditionalFormats[state.conditionalFormatEditIndex] = config;
+        return { conditionalFormats };
+      },
+      () => {
+        this.handleMenuBack();
       }
-      const conditionalFormats = [...state.conditionalFormats];
-      conditionalFormats[state.conditionalFormatIndex] = config;
-      return { conditionalFormats };
-    });
-    // this.handleMenuBack();
+    );
   }
 
   handleConditionalFormatEditorCancel() {
     this.handleMenuBack();
-    // TODO: timing?
-    this.setState(state => {
-      const { conditionalFormatIndex, prevConditionalFormat } = state;
-      log.debug(
-        'handleConditionalFormatEditorCancel',
-        conditionalFormatIndex,
-        prevConditionalFormat
-      );
-      if (state.conditionalFormatIndex === undefined) {
-        log.debug('Invalid format index');
-        return null;
-      }
-
-      const conditionalFormats = [...state.conditionalFormats];
-      if (prevConditionalFormat !== undefined) {
-        conditionalFormats[conditionalFormatIndex] = prevConditionalFormat;
-      } else {
-        conditionalFormats.splice(conditionalFormats.length - 1, 1);
-      }
-      log.debug('canceled:', conditionalFormats);
-      return { conditionalFormats };
-    });
+    // Not resetting conditionalFormatPreview here
+    // to prevent editor fields change during the menu transition
+    this.setState({ conditionalFormatEditIndex: undefined });
   }
 
   handleUpdateCustomColumns(customColumns) {
@@ -2451,7 +2436,8 @@ export class IrisGrid extends Component {
 
       formatter,
       conditionalFormats,
-      conditionalFormatIndex,
+      conditionalFormatPreview,
+      conditionalFormatEditIndex,
 
       sorts,
       reverseType,
@@ -2872,6 +2858,7 @@ export class IrisGrid extends Component {
     const optionItems = this.getCachedOptionItems(
       model.isChartBuilderAvailable,
       model.isCustomColumnsAvailable,
+      model.isConditionalFormatsAvailable,
       model.isRollupAvailable,
       model.isTotalsAvailable,
       model.isSelectDistinctAvailable,
@@ -2918,10 +2905,8 @@ export class IrisGrid extends Component {
           return (
             <ConditionalFormattingEditor
               columns={model.columns}
-              rule={conditionalFormats[conditionalFormatIndex]}
-              disableCancel={
-                conditionalFormats[conditionalFormatIndex] === undefined
-              }
+              rule={conditionalFormatPreview}
+              onUpdate={this.handleConditionalFormatEditorUpdate}
               onSave={this.handleConditionalFormatEditorSave}
               onCancel={this.handleConditionalFormatEditorCancel}
             />
@@ -3104,7 +3089,9 @@ export class IrisGrid extends Component {
                 )}
                 formatColumns={this.getFormatColumns(
                   model.columns,
-                  conditionalFormats
+                  conditionalFormats,
+                  conditionalFormatPreview,
+                  conditionalFormatEditIndex
                 )}
                 rollupConfig={this.getModelRollupConfig(
                   model.originalColumns,

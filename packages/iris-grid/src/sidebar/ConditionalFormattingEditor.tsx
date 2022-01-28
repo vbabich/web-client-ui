@@ -3,19 +3,16 @@ import classNames from 'classnames';
 import { Button } from '@deephaven/components';
 import Log from '@deephaven/log';
 import { FormatColumnWhereIcon, FormatRowWhereIcon } from './icons';
-import { TableUtils } from '..';
 import ConditionalRuleEditor, {
   ConditionConfig,
 } from './conditional-formatting/ConditionalRuleEditor';
-import ConditionalRowFormatEditor, {
+import RowRuleEditor, {
   RowFormatConfig,
-} from './conditional-formatting/ConditionalRowFormatEditor';
+} from './conditional-formatting/RowRuleEditor';
 import {
-  DateCondition,
   FormatStyleType,
   getDefaultConditionForType,
-  NumberCondition,
-  StringCondition,
+  ModelColumn,
 } from './conditional-formatting/ConditionalFormattingUtils';
 import './ConditionalFormattingEditor.scss';
 
@@ -27,22 +24,9 @@ export type CancelCallback = () => void;
 
 export type ChangeCallback = (ruleConfig: ConditionConfig) => void;
 
-export interface ModelColumn {
-  name: string;
-  type: string;
-}
-
 export enum FormatterType {
   CONDITIONAL = 'conditional',
   ROWS = 'rows',
-}
-
-export interface FormatStyleConfig {
-  type: FormatStyleType;
-  customConfig?: {
-    color: string;
-    background: string;
-  };
 }
 
 export interface FormattingRule {
@@ -53,154 +37,12 @@ export interface FormattingRule {
 export interface ConditionalFormattingEditorProps {
   columns: ModelColumn[];
   rule?: FormattingRule;
-  disableCancel?: boolean;
   onCancel?: CancelCallback;
   onSave?: SaveCallback;
   onUpdate?: SaveCallback;
 }
 
 const DEFAULT_CALLBACK = () => undefined;
-
-function getShortLabelForStringCondition(condition: StringCondition): string {
-  switch (condition) {
-    case StringCondition.IS_EXACTLY:
-      return '==';
-    case StringCondition.IS_NOT_EXACTLY:
-      return '!=';
-    case StringCondition.CONTAINS:
-      return 'contains';
-    case StringCondition.DOES_NOT_CONTAIN:
-      return 'does not contain';
-    case StringCondition.STARTS_WITH:
-      return 'starts with';
-    case StringCondition.ENDS_WITH:
-      return 'ends with';
-  }
-}
-
-function getShortLabelForDateCondition(condition: DateCondition): string {
-  switch (condition) {
-    case DateCondition.IS_EXACTLY:
-      return '==';
-    case DateCondition.IS_NOT_EXACTLY:
-      return '!=';
-    case DateCondition.IS_BEFORE:
-      return '<';
-    case DateCondition.IS_BEFORE_OR_EQUAL:
-      return '<=';
-    case DateCondition.IS_AFTER:
-      return '>';
-    case DateCondition.IS_AFTER_OR_EQUAL:
-      return '>=';
-  }
-}
-
-export function getShortLabelForNumberCondition(
-  condition: NumberCondition
-): string {
-  switch (condition) {
-    case NumberCondition.IS_EQUAL:
-      return '==';
-    case NumberCondition.IS_NOT_EQUAL:
-      return '!=';
-    case NumberCondition.IS_BETWEEN:
-      return '==';
-    case NumberCondition.GREATER_THAN:
-      return '>';
-    case NumberCondition.GREATER_THAN_OR_EQUAL:
-      return '>=';
-    case NumberCondition.LESS_THAN:
-      return '<';
-    case NumberCondition.LESS_THAN_OR_EQUAL:
-      return '<=';
-  }
-}
-
-export function getTextForNumberCondition(
-  columnName: string,
-  condition: NumberCondition,
-  value: unknown,
-  start: unknown,
-  end: unknown
-): string {
-  switch (condition) {
-    case NumberCondition.IS_EQUAL:
-      return `${columnName} == ${value}`;
-    case NumberCondition.IS_NOT_EQUAL:
-      return `${columnName} != ${value}`;
-    case NumberCondition.IS_BETWEEN:
-      return `${columnName} > ${start} && ${columnName} < ${end}`;
-    case NumberCondition.GREATER_THAN:
-      return `${columnName} > ${value}`;
-    case NumberCondition.GREATER_THAN_OR_EQUAL:
-      return `${columnName} >= ${value}`;
-    case NumberCondition.LESS_THAN:
-      return `${columnName} < ${value}`;
-    case NumberCondition.LESS_THAN_OR_EQUAL:
-      return `${columnName} <= ${value}`;
-  }
-}
-
-export function getTextForStringCondition(
-  columnName: string,
-  condition: StringCondition,
-  value: unknown
-): string {
-  switch (condition) {
-    case StringCondition.IS_EXACTLY:
-      return `${columnName} == "${value}"`;
-    case StringCondition.IS_NOT_EXACTLY:
-      return `${columnName} != "${value}"`;
-    case StringCondition.CONTAINS:
-      return `${columnName}.contains("${value}")`;
-    case StringCondition.DOES_NOT_CONTAIN:
-      return `!${columnName}.contains("${value}")`;
-    case StringCondition.STARTS_WITH:
-      return `${columnName}.startsWith("${value}")`;
-    case StringCondition.ENDS_WITH:
-      return `${columnName}.endsWith("${value}")`;
-  }
-}
-
-export function getTextForDateCondition(
-  columnName: string,
-  condition: DateCondition,
-  value: unknown
-): string {
-  switch (condition) {
-    case DateCondition.IS_EXACTLY:
-      return `${columnName} == convertDateTime("${value}")`;
-    case DateCondition.IS_NOT_EXACTLY:
-      return `${columnName} != convertDateTime(\`${value}\`)`;
-    case DateCondition.IS_BEFORE:
-      return `${columnName} < convertDateTime(\`${value}\`)`;
-    case DateCondition.IS_BEFORE_OR_EQUAL:
-      return `${columnName} <=  convertDateTime("${value}")`;
-    case DateCondition.IS_AFTER:
-      return `${columnName} > convertDateTime(\`${value}\`)`;
-    case DateCondition.IS_AFTER_OR_EQUAL:
-      return `${columnName} >=  convertDateTime(\`${value}\`)`;
-  }
-}
-
-export function getLabelForConditionType(
-  columnType: string,
-  condition: StringCondition | NumberCondition | DateCondition
-): string {
-  if (TableUtils.isNumberType(columnType)) {
-    return getShortLabelForNumberCondition(condition as NumberCondition);
-  }
-
-  if (TableUtils.isTextType(columnType)) {
-    return getShortLabelForStringCondition(condition as StringCondition);
-  }
-
-  if (TableUtils.isDateType(columnType)) {
-    return getShortLabelForDateCondition(condition as DateCondition);
-  }
-
-  throw new Error('Invalid column type');
-}
 
 function getFormatterTypeIcon(option: FormatterType): JSX.Element | undefined {
   switch (option) {
@@ -209,7 +51,6 @@ function getFormatterTypeIcon(option: FormatterType): JSX.Element | undefined {
     case FormatterType.ROWS:
       return <FormatRowWhereIcon />;
   }
-  return undefined;
 }
 
 function getFormatterTypeLabel(option: FormatterType): string {
@@ -249,7 +90,6 @@ const ConditionalFormattingEditor = (
     onUpdate = DEFAULT_CALLBACK,
     onCancel = DEFAULT_CALLBACK,
     rule: defaultRule,
-    disableCancel = false,
   } = props;
 
   const { type: defaultType } = defaultRule ?? makeDefaultRule(columns);
@@ -327,7 +167,6 @@ const ConditionalFormattingEditor = (
           ))}
         </div>
       </div>
-
       {selectedFormatter === FormatterType.CONDITIONAL && (
         <ConditionalRuleEditor
           columns={columns}
@@ -335,33 +174,20 @@ const ConditionalFormattingEditor = (
           onChange={handleRuleChange}
         />
       )}
-
       {selectedFormatter === FormatterType.ROWS && (
-        <ConditionalRowFormatEditor
+        <RowRuleEditor
           columns={columns}
-          config={rule?.config as ConditionConfig}
+          config={rule?.config as RowFormatConfig}
           onChange={handleRuleChange}
         />
       )}
       <hr />
       <div className="d-flex justify-content-end my-3">
-        {!disableCancel && (
-          <Button kind="secondary" onClick={handleCancel} className="mr-2">
-            {' '}
-            Cancel
-          </Button>
-        )}
-
-        <Button
-          kind="primary"
-          onClick={handleApply}
-          disabled={
-            selectedFormatter !== FormatterType.CONDITIONAL &&
-            // selectedFormatter !== FormatterType.ADVANCED &&
-            selectedFormatter !== FormatterType.ROWS
-          }
-        >
-          Apply Format
+        <Button kind="secondary" onClick={handleCancel} className="mr-2">
+          Cancel
+        </Button>
+        <Button kind="primary" onClick={handleApply}>
+          Save
         </Button>
       </div>
     </div>

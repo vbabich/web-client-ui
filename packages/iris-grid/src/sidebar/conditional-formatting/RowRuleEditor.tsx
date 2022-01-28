@@ -3,11 +3,7 @@ import Log from '@deephaven/log';
 import { ColorUtils } from '@deephaven/utils';
 import { ComboBox } from '@deephaven/components';
 import { TableUtils } from '../..';
-import {
-  ModelColumn,
-  FormatStyleConfig,
-  ChangeCallback,
-} from '../ConditionalFormattingEditor';
+import { ChangeCallback } from '../ConditionalFormattingEditor';
 import {
   getLabelForStyleType,
   NumberCondition,
@@ -18,12 +14,11 @@ import {
   getLabelForDateCondition,
   getLabelForStringCondition,
   getDefaultConditionForType,
+  FormatStyleConfig,
+  ModelColumn,
 } from './ConditionalFormattingUtils';
 
-import '../ConditionalFormattingEditor.scss';
-
-// TODO: rename to row format editor
-const log = Log.module('ConditionalRowFormatEditor');
+const log = Log.module('RowRuleEditor');
 
 export interface RowFormatConfig {
   column: ModelColumn;
@@ -34,7 +29,7 @@ export interface RowFormatConfig {
   style: FormatStyleConfig;
 }
 
-export interface ConditionalRowFormatEditorProps {
+export interface RowRuleEditorProps {
   columns: ModelColumn[];
   config?: RowFormatConfig;
   onChange?: ChangeCallback;
@@ -117,9 +112,7 @@ const styleOptions = [
   </option>
 ));
 
-const ConditionalRowFormatEditor = (
-  props: ConditionalRowFormatEditorProps
-): JSX.Element => {
+const RowRuleEditor = (props: RowRuleEditorProps): JSX.Element => {
   const {
     columns,
     config = makeDefaultConfig(columns),
@@ -197,72 +190,6 @@ const ConditionalRowFormatEditor = (
     [columns, selectedColumnType]
   );
 
-  //   const handleApply = useCallback(() => {
-  //     // TODO: validation
-  //     if (selectedColumn === undefined) {
-  //       log.error('Unable to create formatting rule. Column is not selected.');
-  //       return;
-  //     }
-
-  //     if (selectedStyle === undefined) {
-  //       log.error('Unable to create formatting rule. Style is not selected.');
-  //       return;
-  //     }
-
-  //     if (selectedCondition === undefined) {
-  //       log.error('Unable to create formatting rule. Condition is not selected.');
-  //       return;
-  //     }
-
-  //     const { type, name } = selectedColumn;
-  //     const column = { type, name };
-
-  //     log.debug(
-  //       'TEST',
-  //       TableUtils.isNumberType(selectedColumn.type),
-  //       Number.isNaN(Number(conditionValue))
-  //     );
-
-  //     if (
-  //       TableUtils.isNumberType(selectedColumn.type) &&
-  //       Number.isNaN(Number(conditionValue))
-  //     ) {
-  //       log.error(
-  //         'Unable to create formatting rule. Invalid value',
-  //         conditionValue
-  //       );
-  //       return;
-  //     }
-  //     // const rule = `${
-  //     //   selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
-  //     // } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
-  //     // TODO: build config based on formatter type, conditions, values, style, etc
-  //     onApply(
-  //       {
-  //         type: selectedFormatter,
-  //         column,
-  //         config: {
-  //           condition: selectedCondition,
-  //           style: {
-  //             type: selectedStyle,
-  //             // TODO
-  //             customConfig: undefined,
-  //           },
-  //           value: conditionValue,
-  //         },
-  //       },
-  //       id
-  //     );
-  //   }, [
-  //     onApply,
-  //     selectedColumn,
-  //     selectedCondition,
-  //     selectedFormatter,
-  //     selectedStyle,
-  //     conditionValue,
-  //     id,
-  //   ]);
-
   const handleConditionChange = useCallback(
     e => {
       const { value } = e.target;
@@ -335,7 +262,6 @@ const ConditionalRowFormatEditor = (
       );
       return;
     }
-    // TODO: debounce?
     onChange({
       column,
       condition: selectedCondition,
@@ -503,4 +429,4 @@ const ConditionalRowFormatEditor = (
   );
 };
 
-export default ConditionalRowFormatEditor;
+export default RowRuleEditor;

@@ -314,6 +314,10 @@ class IrisGridTableModel extends IrisGridModel {
     return this.table.applyCustomColumns != null;
   }
 
+  get isConditionalFormatsAvailable() {
+    return this.table.applyCustomColumns != null;
+  }
+
   get isChartBuilderAvailable() {
     return true;
   }

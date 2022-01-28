@@ -3,26 +3,29 @@ import Log from '@deephaven/log';
 import { ColorUtils } from '@deephaven/utils';
 import { ComboBox } from '@deephaven/components';
 import { TableUtils } from '../..';
-import {
-  ModelColumn,
-  FormatStyleConfig,
-  ChangeCallback,
-} from '../ConditionalFormattingEditor';
+import { ChangeCallback } from '../ConditionalFormattingEditor';
 import {
   DateCondition,
+  FormatStyleConfig,
   FormatStyleType,
   getDefaultConditionForType,
   getLabelForDateCondition,
   getLabelForNumberCondition,
   getLabelForStringCondition,
   getLabelForStyleType,
+  ModelColumn,
   NumberCondition,
   StringCondition,
 } from './ConditionalFormattingUtils';
 
-import '../ConditionalFormattingEditor.scss';
-
 const log = Log.module('ConditionalRuleEditor');
+
+// TODO: move to utils?
+const DEFAULT_BACKGROUND = '#fcfcfa';
+
+const DEFAULT_COLOR_LIGHT = '#f0f0ee';
+
+const DEFAULT_COLOR_DARK = '#1a171a';
 
 export interface ConditionConfig {
   column: ModelColumn;
@@ -125,30 +128,22 @@ const ConditionalRuleEditor = (
     onChange = DEFAULT_CALLBACK,
   } = props;
 
-  // TODO
-  const { column: defaultColumn } = config;
-
   const [selectedColumn, setColumn] = useState(
     columns.length > 0
       ? columns.find(
-          c => c.name === defaultColumn.name && c.type === defaultColumn.type
+          c => c.name === config.column.name && c.type === config.column.type
         )
       : undefined
   );
-
-  const [conditionValue, setConditionValue] = useState(config?.value);
-  const [startValue, setStartValue] = useState(config?.start);
-  const [endValue, setEndValue] = useState(config?.end);
-  // TODO: style only needed for some of the conditional format types
-  const [selectedStyle, setStyle] = useState(
-    (config as ConditionConfig).style.type
-  );
-
-  const [selectedColor, setColor] = useState(
-    (config as ConditionConfig).style.customConfig?.background ?? '#fcfcfa'
-  );
-
   const selectedColumnType = selectedColumn?.type;
+  const [selectedCondition, setCondition] = useState(config.condition);
+  const [conditionValue, setConditionValue] = useState(config.value);
+  const [startValue, setStartValue] = useState(config.start);
+  const [endValue, setEndValue] = useState(config.end);
+  const [selectedStyle, setStyle] = useState(config.style.type);
+  const [selectedBackground, setBackground] = useState(
+    config.style.customConfig?.background ?? DEFAULT_BACKGROUND
+  );
 
   const conditions = useMemo(() => {
     if (selectedColumnType === undefined) {
@@ -165,11 +160,6 @@ const ConditionalRuleEditor = (
     }
   }, [selectedColumnType]);
 
-  // TODO: test on different columns
-  const [selectedCondition, setCondition] = useState(
-    (config as ConditionConfig).condition
-  );
-
   const handleColumnChange = useCallback(
     value => {
       const newColumn = columns.find(({ name }) => name === value);
@@ -184,72 +174,6 @@ const ConditionalRuleEditor = (
     },
     [columns, selectedColumnType]
   );
-
-  //   const handleApply = useCallback(() => {
-  //     // TODO: validation
-  //     if (selectedColumn === undefined) {
-  //       log.error('Unable to create formatting rule. Column is not selected.');
-  //       return;
-  //     }
-
-  //     if (selectedStyle === undefined) {
-  //       log.error('Unable to create formatting rule. Style is not selected.');
-  //       return;
-  //     }
-
-  //     if (selectedCondition === undefined) {
-  //       log.error('Unable to create formatting rule. Condition is not selected.');
-  //       return;
-  //     }
-
-  //     const { type, name } = selectedColumn;
-  //     const column = { type, name };
-
-  //     log.debug(
-  //       'TEST',
-  //       TableUtils.isNumberType(selectedColumn.type),
-  //       Number.isNaN(Number(conditionValue))
-  //     );
-
-  //     if (
-  //       TableUtils.isNumberType(selectedColumn.type) &&
-  //       Number.isNaN(Number(conditionValue))
-  //     ) {
-  //       log.error(
-  //         'Unable to create formatting rule. Invalid value',
-  //         conditionValue
-  //       );
-  //       return;
-  //     }
-  //     // const rule = `${
-  //     //   selectedFormatter === FormatterType.ROWS ? '[ROW]' : '[COL]'
-  //     // } ${selectedColumn.name} ${selectedCondition} ${conditionValue ?? '""'}`;
-  //     // TODO: build config based on formatter type, conditions, values, style, etc
-  //     onApply(
-  //       {
-  //         type: selectedFormatter,
-  //         column,
-  //         config: {
-  //           condition: selectedCondition,
-  //           style: {
-  //             type: selectedStyle,
-  //             // TODO
-  //             customConfig: undefined,
-  //           },
-  //           value: conditionValue,
-  //         },
-  //       },
-  //       id
-  //     );
-  //   }, [
-  //     onApply,
-  //     selectedColumn,
-  //     selectedCondition,
-  //     selectedFormatter,
-  //     selectedStyle,
-  //     conditionValue,
-  //     id,
-  //   ]);
 
   const handleConditionChange = useCallback(
     e => {
@@ -284,10 +208,10 @@ const ConditionalRuleEditor = (
     setStyle(value);
   }, []);
 
-  const handleColorChange = useCallback(e => {
+  const handleBackgroundChange = useCallback(e => {
     const { value } = e.target;
-    log.debug('handleColorChange', value);
-    setColor(value);
+    log.debug('handleBackgroundChange', value);
+    setBackground(value);
   }, []);
 
   useEffect(() => {
@@ -323,7 +247,6 @@ const ConditionalRuleEditor = (
       );
       return;
     }
-    // TODO: debounce?
     onChange({
       column,
       condition: selectedCondition,
@@ -331,11 +254,12 @@ const ConditionalRuleEditor = (
         type: selectedStyle,
         // TODO
         customConfig: {
-          //
           // $interfacewhite: #f0f0ee;
           // $interfaceblack: #1a171a;
-          color: ColorUtils.isDark(selectedColor) ? '#f0f0ee' : '#1a171a',
-          background: selectedColor,
+          color: ColorUtils.isDark(selectedBackground)
+            ? DEFAULT_COLOR_LIGHT
+            : DEFAULT_COLOR_DARK,
+          background: selectedBackground,
         },
       },
       value: conditionValue,
@@ -344,7 +268,7 @@ const ConditionalRuleEditor = (
     });
   }, [
     onChange,
-    selectedColor,
+    selectedBackground,
     selectedColumn,
     selectedStyle,
     selectedCondition,
@@ -477,14 +401,14 @@ const ConditionalRuleEditor = (
           {selectedStyle === FormatStyleType.CUSTOM && (
             <div className="mb-2">
               <label className="mb-0" htmlFor="color-select">
-                Color
+                Background
               </label>
               <input
                 type="color"
-                value={selectedColor}
+                value={selectedBackground}
                 className="custom-select"
                 id="color-select"
-                onChange={handleColorChange}
+                onChange={handleBackgroundChange}
               />
             </div>
           )}

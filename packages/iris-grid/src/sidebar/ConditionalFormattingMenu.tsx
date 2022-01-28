@@ -5,17 +5,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { dhNewCircleLargeFilled, vsGripper, vsTrash } from '@deephaven/icons';
 import { Button, DragUtils, Tooltip } from '@deephaven/components';
 import Log from '@deephaven/log';
-import {
-  FormatterType,
-  FormattingRule,
-  getLabelForConditionType,
-} from './ConditionalFormattingEditor';
+import { FormatterType, FormattingRule } from './ConditionalFormattingEditor';
 
 import './ConditionalFormattingMenu.scss';
 import { ConditionConfig } from './conditional-formatting/ConditionalRuleEditor';
 import {
   getBackgroundForStyleConfig,
   getColorForStyleConfig,
+  getShortLabelForConditionType,
   NumberCondition,
 } from './conditional-formatting/ConditionalFormattingUtils';
 import { TableUtils } from '..';
@@ -27,11 +24,6 @@ export type ChangeCallback = (rules: FormattingRule[]) => void;
 export type SelectCallback = (index: number) => void;
 
 export type CreateCallback = () => void;
-
-export type ModelColumn = {
-  name: string;
-  type: string;
-};
 
 export type ConditionalFormattingMenuProps = {
   rules: FormattingRule[];
@@ -66,7 +58,7 @@ function getRuleTitle(config: ConditionConfig): string {
   ) {
     return `${config.start} < ${config.column.name} < ${config.end}`;
   }
-  return `${config.column.name} ${getLabelForConditionType(
+  return `${config.column.name} ${getShortLabelForConditionType(
     (config as ConditionConfig).column.type,
     (config as ConditionConfig).condition
   )} 
@@ -86,7 +78,7 @@ const ConditionalFormattingMenu = (
   const handleRuleClick = useCallback(
     (e, rule, index) => {
       e.stopPropagation();
-      log.debug('rule clicked', rule, index);
+      log.debug('Rule clicked', rule, index);
       onSelect(index);
     },
     [onSelect]
@@ -95,7 +87,7 @@ const ConditionalFormattingMenu = (
   const handleDeleteClick = useCallback(
     (e, rule, index) => {
       e.stopPropagation();
-      log.debug('delete button clicked', rule, index);
+      log.debug('Delete button clicked', rule, index);
       const updatedRules = [...rules];
       updatedRules.splice(index, 1);
       onChange(updatedRules);
