@@ -81,16 +81,16 @@ class IrisGridTreeTableModel extends IrisGridTableModelTemplate<
   applyBufferedViewport(
     viewportTop: number,
     viewportBottom: number,
-    columns: DhType.Column[]
+    columns?: DhType.Column[]
   ): void {
     const viewportColumns = [
       // Need to always fetch the grouped columns so we always have key data for the rows
       // Used to display our virtual key column
       ...this.table.groupedColumns,
-      ...columns.filter(
+      ...(columns?.filter(
         c =>
           !this.virtualColumns.includes(c) && !this.groupedColumns.includes(c)
-      ),
+      ) ?? []),
     ];
     this.table.setViewport(viewportTop, viewportBottom, viewportColumns);
   }
@@ -145,7 +145,8 @@ class IrisGridTreeTableModel extends IrisGridTableModelTemplate<
   async snapshot(
     ranges: GridRange[],
     includeHeaders?: boolean,
-    formatValue?: (value: unknown, column: DhType.Column) => unknown
+    formatValue: (value: unknown, column: DhType.Column) => unknown = value =>
+      value
   ): Promise<unknown[][]> {
     assertNotNull(this.viewport);
     assertNotNull(this.viewportData);
