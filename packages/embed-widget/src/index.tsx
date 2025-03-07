@@ -36,12 +36,14 @@ async function getCorePlugins() {
     GridPluginConfig,
     PandasPluginConfig,
     ChartPluginConfig,
+    SimplePivotPluginConfig,
     WidgetLoaderPluginConfig,
   } = dashboardCorePlugins;
   return [
     GridPluginConfig,
     PandasPluginConfig,
     ChartPluginConfig,
+    SimplePivotPluginConfig,
     WidgetLoaderPluginConfig,
   ];
 }
