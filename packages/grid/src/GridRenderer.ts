@@ -1,5 +1,6 @@
 import clamp from 'lodash.clamp';
 import { ColorUtils, getOrThrow } from '@deephaven/utils';
+import Log from '@deephaven/log';
 import memoizeClear from './memoizeClear';
 import GridUtils from './GridUtils';
 import GridColorUtils from './GridColorUtils';
@@ -13,6 +14,8 @@ import { DEFAULT_FONT_WIDTH, GridRenderState } from './GridRendererTypes';
 import CellRenderer, { CellRenderType } from './CellRenderer';
 import DataBarCellRenderer from './DataBarCellRenderer';
 import TextCellRenderer from './TextCellRenderer';
+
+const log = Log.module('GridRenderer');
 
 type NoneNullColumnRange = { startColumn: number; endColumn: number };
 
@@ -1849,6 +1852,9 @@ export class GridRenderer {
       allRowYs,
       width,
     } = metrics;
+
+    log.debug('[0] drawRowFooters', rowFooterWidth);
+
     if (rowFooterWidth <= 0) {
       return;
     }
