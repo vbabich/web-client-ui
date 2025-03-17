@@ -1108,9 +1108,7 @@ class IrisGridTableModelTemplate<
     for (let c = 0; c < columns.length; c += 1) {
       const column = columns[c];
       const [name, operation = operationMap?.[name]?.[0] ?? defaultOperation] =
-        column.name === '__TOTALS_COLUMN'
-          ? ['__TOTALS_COLUMN']
-          : column.name.split('__');
+        column.name.split('__');
       if (!dataMap.has(operation)) {
         dataMap.set(operation, { data: new Map() });
       }
@@ -1122,7 +1120,7 @@ class IrisGridTableModelTemplate<
       });
     }
 
-    log.debug2('[0] copyTotalsData', dataMap);
+    log.debug2('copyTotalsData', dataMap);
 
     this.totalsDataMap = dataMap;
     this.formattedStringData = [];
