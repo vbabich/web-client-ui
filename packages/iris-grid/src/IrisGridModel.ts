@@ -428,6 +428,13 @@ abstract class IrisGridModel<
   }
 
   /**
+   * @returns True if this model should allow to organize columns
+   */
+  get isOrganizeColumnsAvailable(): boolean {
+    return false;
+  }
+
+  /**
    * @returns True if the rollup rows functionality is available
    */
   get isRollupAvailable(): boolean {
