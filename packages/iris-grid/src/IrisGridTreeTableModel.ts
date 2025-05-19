@@ -336,12 +336,16 @@ class IrisGridTreeTableModel extends IrisGridTableModelTemplate<
       columns: readonly DhType.Column[],
       groupedColumns: readonly DhType.Column[],
       virtualColumns: readonly DhType.Column[]
-    ) =>
-      new Set(
-        (groupedColumns?.length > 0 ? groupedColumns : columns)
+    ) => {
+      log.debug('[0]', { groupedColumns, columns, virtualColumns });
+      const result = new Set(
+        // (groupedColumns?.length > 0 ? groupedColumns : columns)
+        columns
           .filter(c => !virtualColumns.includes(c))
           .map(c1 => columns.findIndex(c2 => c1.name === c2.name))
-      )
+      );
+      return result;
+    }
   );
 
   getCachedGroupedColumnSet = memoize(

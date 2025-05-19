@@ -367,11 +367,14 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
       throw new Error('Rollup Rows are not available');
     }
 
+    // TODO:
+    // Make sure filters are always applied to the original model, not to the rollup
+    // Check if filters are already set on the model
     // Prevent model update when IrisGridModelUpdater is mounted
     // if rollup is already initialized in IrisGridPanel
-    if (deepEqual(rollupConfig, this.rollup)) {
-      return;
-    }
+    // if (deepEqual(rollupConfig, this.rollup)) {
+    //   return;
+    // }
 
     this.rollup = rollupConfig;
 
@@ -386,6 +389,15 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
         .then(table => makeModel(this.dh, table, this.formatter));
     }
     this.setNextModel(modelPromise);
+  }
+
+  set filter(filter: DhType.FilterCondition[]) {
+    log.debug('[0]', { filter }, this.rollupConfig);
+    if (this.rollupConfig != null) {
+      this.originalModel.filter = filter;
+    } else {
+      this.model.filter = filter;
+    }
   }
 
   get selectDistinctColumns(): ColumnName[] {
