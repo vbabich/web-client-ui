@@ -391,14 +391,15 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
     this.setNextModel(modelPromise);
   }
 
-  set filter(filter: DhType.FilterCondition[]) {
-    log.debug('[0]', { filter }, this.rollupConfig);
-    if (this.rollupConfig != null) {
-      this.originalModel.filter = filter;
-    } else {
-      this.model.filter = filter;
-    }
-  }
+  // TODO: Remove this
+  // set filter(filter: DhType.FilterCondition[]) {
+  //   log.debug('[0]', { filter }, this.rollupConfig);
+  //   if (this.rollupConfig != null) {
+  //     this.originalModel.filter = filter;
+  //   } else {
+  //     this.model.filter = filter;
+  //   }
+  // }
 
   get selectDistinctColumns(): ColumnName[] {
     return this.selectDistinct;

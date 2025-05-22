@@ -853,9 +853,11 @@ class IrisGridUtils {
       });
 
       if (nonAggregatedColumnSet.size > 0) {
-        const existingColumns =
-          aggregationMap[AggregationOperation.FIRST] ?? [];
-        aggregationMap[AggregationOperation.FIRST] = [
+        // TODO: SKIP operation is only supported in the Core+
+        // Find a way to fall back to FIRST in Legacy
+        // Use feature detection to check if SKIP is supported.
+        const existingColumns = aggregationMap[AggregationOperation.SKIP] ?? [];
+        aggregationMap[AggregationOperation.SKIP] = [
           ...existingColumns,
           ...nonAggregatedColumnSet,
         ];

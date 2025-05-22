@@ -62,6 +62,8 @@ export const isValidOperation = (
     case AggregationOperation.COUNT_DISTINCT:
     case AggregationOperation.DISTINCT:
     case AggregationOperation.UNIQUE:
+    case AggregationOperation.SKIP:
+      // TODO: use feature detection to check if SKIP is supported
       return true;
     case AggregationOperation.MEDIAN:
     case AggregationOperation.MIN:
@@ -77,8 +79,9 @@ export const isValidOperation = (
     case AggregationOperation.AVG:
     case AggregationOperation.STD:
       return TableUtils.isNumberType(columnType);
-    case AggregationOperation.SKIP:
-      return false;
+    // TODO: Remove
+    // case AggregationOperation.SKIP:
+    // return false;
     // No default case - if AggregationOperation is added, we'll get a compile time error
   }
 };
