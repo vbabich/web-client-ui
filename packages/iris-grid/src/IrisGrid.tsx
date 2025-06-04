@@ -173,6 +173,7 @@ import AggregationOperation from './sidebar/aggregations/AggregationOperation';
 import { UIRollupConfig } from './sidebar/RollupRows';
 import {
   Action,
+  AdvancedFilter,
   AdvancedFilterMap,
   AdvancedFilterOptions,
   ColumnName,
@@ -181,6 +182,7 @@ import {
   OptionItem,
   PendingDataErrorMap,
   PendingDataMap,
+  QuickFilter,
   QuickFilterMap,
   ReadonlyAdvancedFilterMap,
   ReadonlyAggregationMap,
@@ -258,6 +260,11 @@ export type FilterMap = Map<
     filterList: FilterData[];
   }
 >;
+
+export interface PendingRollupFilters {
+  quickFilters: ReadonlyMap<string, QuickFilter>;
+  advancedFilters: ReadonlyMap<string, AdvancedFilter>;
+}
 
 export interface IrisGridContextMenuData {
   model: IrisGridModel;
@@ -426,6 +433,7 @@ export interface IrisGridState {
   rollupSelectedColumns: readonly ColumnName[];
   aggregationSettings: AggregationSettings;
   selectedAggregation: Aggregation | null;
+  pendingRollupFilters: PendingRollupFilters;
 
   openOptions: readonly OptionItem[];
 
@@ -853,6 +861,10 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       rollupSelectedColumns: [],
       aggregationSettings,
       selectedAggregation: null,
+      pendingRollupFilters: {
+        quickFilters: EMPTY_MAP,
+        advancedFilters: EMPTY_MAP,
+      },
 
       openOptions: [],
 
@@ -1316,14 +1328,32 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   getModelRollupConfig = memoize(
     (
-      originalColumns: readonly DhType.Column[],
+      model: IrisGridModel,
       config: UIRollupConfig | undefined,
-      aggregationSettings: AggregationSettings
+      aggregationSettings: AggregationSettings,
+      pendingRollupFilters: PendingRollupFilters,
+      quickFilters: ReadonlyQuickFilterMap,
+      advancedFilters: ReadonlyAdvancedFilterMap,
+      aggregationOperationForSkip: AggregationOperation
     ) =>
       IrisGridUtils.getModelRollupConfig(
-        originalColumns,
+        model.originalColumns,
         config,
-        aggregationSettings
+        aggregationSettings,
+        [
+          ...pendingRollupFilters.quickFilters.keys(),
+          ...Array.from(quickFilters.keys()).map(
+            (index: ModelIndex) => model.columns[index]?.name
+          ),
+          ...pendingRollupFilters.advancedFilters.keys(),
+          ...Array.from(advancedFilters.keys()).map(
+            (index: ModelIndex) => model.columns[index]?.name
+          ),
+        ],
+        // TODO: SKIP operation is only supported in the Core+
+        // Find a way to fall back to FIRST in Legacy
+        // Use feature detection to check if SKIP is supported.
+        aggregationOperationForSkip
       )
   );
 
@@ -1384,6 +1414,25 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       isMenuShown,
     }),
     { max: 1 }
+  );
+
+  getCachedFilteredColumnNames = memoize(
+    (
+      columns: readonly DhType.Column[],
+      quickFilters: ReadonlyQuickFilterMap,
+      advancedFilters: ReadonlyAdvancedFilterMap
+    ) => {
+      // Iterate over quickFilters map keys and return the column names
+      const quickFilterColumnNames = Array.from(quickFilters.keys())
+        .map(index => columns[index]?.name)
+        .filter((name): name is string => name != null);
+      // TODO: test with moved columns, test persistence, throw if column not found?
+      const advancedFilterColumnNames = Array.from(advancedFilters.keys())
+        .map(index => columns[index]?.name)
+        .filter((name): name is string => name != null);
+      // TODO: deduplicate names
+      return [...quickFilterColumnNames, ...advancedFilterColumnNames];
+    }
   );
 
   getCachedFilter = memoize(
@@ -1789,6 +1838,51 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       advancedFilters: new Map(),
       searchValue: '',
       searchFilter: undefined,
+    });
+  }
+
+  savePendingFiltersForRollup(rollupConfig: UIRollupConfig | undefined): void {
+    log.debug('[2] Updating filters for rollup', rollupConfig);
+    // Legacy showNonAggregatedColumns means all columns are shown
+    if (/* legacy && */ rollupConfig?.showNonAggregatedColumns === true) {
+      // TODO: re-calculate filter column indexes since the columns might move around after rollup
+      return;
+    }
+
+    // // Core+ showConstituents means all columns are shown
+    // if (/* Core+ && */ rollupConfig?.showConstituents === true) {
+    //   // TODO: re-calculate filter column indexes since the columns might move around after rollup
+    //   return;
+    // }
+
+    // TODO: test quick filters applied in different order - check if the resulting order is correct
+    const { quickFilters, advancedFilters } = this.state;
+    log.debug('[2] Updating filters for rollup', {
+      rollupConfig,
+      quickFilters,
+      advancedFilters,
+    });
+    const pendingQuickFilters = new Map();
+    const pendingAdvancedFilters = new Map();
+
+    // If we have a rollup config, we need to remove all quick and advanced filters from aggregated columns (ONLY FOR CORE+!?)
+    // Then get the column names for the filtered columns if the filtered columns are not grouping columns and not aggregated columns.
+    // And store in the pendingFiltersForRollup state variable
+
+    const { model } = this.props;
+    const { columns } = model;
+
+    quickFilters.forEach((value, key) => {
+      const column = columns[key];
+      pendingQuickFilters.set(column.name, value);
+    });
+
+    // Update filters
+    this.setState({
+      pendingRollupFilters: {
+        quickFilters: pendingQuickFilters,
+        advancedFilters: pendingAdvancedFilters,
+      },
     });
   }
 
@@ -2312,7 +2406,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         quickFilters: new Map(),
         reverse: false,
         rollupConfig: undefined,
-        selectDistinctColumns: [],
+        selectDistinctColumns: EMPTY_ARRAY,
         sorts: [],
       });
     }
@@ -3409,10 +3503,53 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   handleCustomColumnsChanged(): void {
     log.debug('custom columns changed');
-    const { isReady } = this.state;
+    const { isReady, pendingRollupFilters } = this.state;
+    const { model } = this.props;
+    const {
+      quickFilters: pendingQuickFilters,
+      advancedFilters: pendingAdvancedFilters,
+    } = pendingRollupFilters;
+    // TODO: test this with pending rollup filters on initial load
     if (isReady) {
       this.stopLoading();
-      this.grid?.forceUpdate();
+      if (pendingQuickFilters.size > 0 || pendingAdvancedFilters.size > 0) {
+        log.debug(
+          '[3] Model columns:',
+          model.columns.map(c => c.name).join(', '),
+          model.originalColumns.map(c => c.name).join(', ')
+        );
+        // If there are pending rollup filters, we need to re-calc column indexes and apply them
+        const quickFilters = new Map();
+        const advancedFilters = new Map();
+        pendingQuickFilters.forEach((filter, columnName) => {
+          const modelIndex = model.getColumnIndexByName(columnName);
+          if (modelIndex != null) {
+            quickFilters.set(modelIndex, filter);
+          }
+        });
+        pendingAdvancedFilters.forEach((filter, columnName) => {
+          const modelIndex = model.getColumnIndexByName(columnName);
+          if (modelIndex != null) {
+            advancedFilters.set(modelIndex, filter);
+          }
+        });
+
+        log.debug(
+          '[3] Applying pending rollup filters after columns change',
+          JSON.stringify({ pendingQuickFilters, pendingAdvancedFilters }),
+          JSON.stringify({ quickFilters, advancedFilters })
+        );
+        this.setState({
+          quickFilters,
+          advancedFilters,
+          pendingRollupFilters: {
+            quickFilters: EMPTY_MAP,
+            advancedFilters: EMPTY_MAP,
+          },
+        });
+      } else {
+        this.grid?.forceUpdate();
+      }
     } else {
       this.loadTableState();
     }
@@ -3522,8 +3659,14 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   handleRollupChange(rollupConfig: UIRollupConfig): void {
     log.info('Rollup change', rollupConfig);
 
+    // TODO: deepEqual check for the rollupConfig and return
+    // otherwise we clear the filter when dragging the column out and back into the rollup
+
     this.resetGridViewState();
     this.showAllColumns();
+
+    // TODO:?
+    this.savePendingFiltersForRollup(rollupConfig);
     this.clearAllFilters();
 
     this.startLoading(
@@ -3536,6 +3679,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     this.setState({
       rollupConfig,
       movedColumns: [],
+      // TODO: this triggers an unnecessary model update that in turn updates columns and messes rollup update
       frozenColumns: [],
       sorts: [],
       reverse: false,
@@ -4296,6 +4440,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       aggregationSettings,
       selectedAggregation,
       rollupConfig,
+      pendingRollupFilters,
       openOptions,
       pendingSavePromise,
       pendingSaveError,
@@ -4473,7 +4618,8 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         const columnWidth = allColumnWidths.get(columnIndex);
         const modelColumn = this.getModelColumn(columnIndex);
         if (modelColumn != null) {
-          const isFilterable = model.isFilterable(modelColumn);
+          const isFilterable =
+            model.isValuesTableAvailable && model.isFilterable(modelColumn);
           if (
             isFilterable &&
             columnX != null &&
@@ -4887,9 +5033,15 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
                     : undefined
                 )}
                 rollupConfig={this.getModelRollupConfig(
-                  model.originalColumns,
+                  model,
                   rollupConfig,
-                  aggregationSettings
+                  aggregationSettings,
+                  pendingRollupFilters,
+                  quickFilters,
+                  advancedFilters,
+                  IrisGridUtils.getSkipAggregationOperation(
+                    model.dh.AggregationOperation
+                  )
                 )}
                 totalsConfig={this.getModelTotalsConfig(
                   model.columns,

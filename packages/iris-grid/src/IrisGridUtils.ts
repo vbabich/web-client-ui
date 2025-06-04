@@ -802,12 +802,15 @@ class IrisGridUtils {
    * @param  originalColumns Original model columns
    * @param  config Dehydrated rollup config
    * @param  aggregationSettings Aggregation settings
+   * @param  filteredColumnNames Filtered column names
    * @returns Rollup config for the model
    */
   static getModelRollupConfig(
     originalColumns: readonly DhType.Column[],
     config: UIRollupConfig | undefined,
-    aggregationSettings: AggregationSettings
+    aggregationSettings: AggregationSettings,
+    filteredColumnNames: readonly string[],
+    skipAggregationOperation: AggregationOperation
   ): DhType.RollupConfig | null {
     if ((config?.columns?.length ?? 0) === 0) {
       return null;
@@ -853,16 +856,29 @@ class IrisGridUtils {
       });
 
       if (nonAggregatedColumnSet.size > 0) {
-        // TODO: SKIP operation is only supported in the Core+
-        // Find a way to fall back to FIRST in Legacy
-        // Use feature detection to check if SKIP is supported.
-        const existingColumns = aggregationMap[AggregationOperation.SKIP] ?? [];
-        aggregationMap[AggregationOperation.SKIP] = [
+        const existingColumns = aggregationMap[skipAggregationOperation] ?? [];
+        aggregationMap[skipAggregationOperation] = [
           ...existingColumns,
           ...nonAggregatedColumnSet,
         ];
       }
+    } else {
+      // Include filtered non-aggregated columns in the aggregation map
+      // TODO: collapse these columns in the UI
+      const filteredNonAggregatedColumnNames = filteredColumnNames.filter(
+        name =>
+          !groupingColumns.includes(name) &&
+          !aggregationColumns.some(columns => columns.includes(name))
+      );
+      aggregationMap[skipAggregationOperation] =
+        filteredNonAggregatedColumnNames;
     }
+
+    log.debug('[0] [IrisGridUtils] rollupConfig', {
+      filteredColumnNames,
+      aggregationMap,
+      skipAggregationOperation,
+    });
 
     return {
       groupingColumns,
@@ -870,6 +886,43 @@ class IrisGridUtils {
       includeDescriptions,
       aggregations: aggregationMap,
     };
+  }
+
+  /**
+   * Type guard to check if the provided aggregationOperation has a `canAggregateType` method
+   */
+  static hasCanAggregateType(
+    aggregationOperation: unknown
+  ): aggregationOperation is typeof DhType.AggregationOperation & {
+    canAggregateType: (operation: string, columnType: string) => boolean;
+  } {
+    return (
+      aggregationOperation != null &&
+      typeof aggregationOperation === 'object' &&
+      'canAggregateType' in aggregationOperation &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      typeof (aggregationOperation as any).canAggregateType === 'function'
+    );
+  }
+
+  /**
+   * Get the aggregation operation to use for skip aggregation
+   * @param  aggregationOperation The AggregationOperation instance to check
+   * @returns The aggregation operation to use for skip aggregation
+   */
+  static getSkipAggregationOperation(
+    // TODO: fix this to work with DHE types as well
+    aggregationOperation: DhType.AggregationOperation
+  ): AggregationOperation {
+    // TODO: fix this
+    return AggregationOperation.FIRST; // SKIP;
+    // TODO: figure out what to pass as the second argument?
+    // This check is supposed to be global, not per column
+    // Or maybe just return SKIP if hasCanAggregateType is true?
+    // return IrisGridUtils.hasCanAggregateType(aggregationOperation, '') &&
+    //   aggregationOperation.canAggregateType(AggregationOperation.SKIP)
+    //   ? AggregationOperation.SKIP
+    //   : AggregationOperation.FIRST;
   }
 
   /**
@@ -939,7 +992,7 @@ class IrisGridUtils {
    */
   static changeFilterColumnNamesToIndexes<T>(
     columns: readonly DhType.Column[],
-    filters: { name: ColumnName; filter: T }[]
+    filters: readonly { name: ColumnName; filter: T }[]
   ): [number, T][] {
     return filters
       .map(({ name, filter }): null | [number, T] => {

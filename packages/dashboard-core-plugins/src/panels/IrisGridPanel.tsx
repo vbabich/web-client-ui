@@ -45,6 +45,7 @@ import {
   ColumnHeaderGroup,
   IrisGridContextMenuData,
   PartitionConfig,
+  AggregationOperation,
 } from '@deephaven/iris-grid';
 import {
   type AdvancedFilterOptions,
@@ -502,6 +503,8 @@ export class IrisGridPanel extends PureComponent<
         customColumns,
         selectDistinctColumns = [],
         rollupConfig,
+        quickFilters = [],
+        advancedFilters = [],
       } = { ...irisGridState, ...irisGridStateOverrides };
 
       if (customColumns.length > 0) {
@@ -512,6 +515,29 @@ export class IrisGridPanel extends PureComponent<
       }
 
       if (rollupConfig != null && rollupConfig.columns.length > 0) {
+        // TODO: deduplicate
+        const quickFilterColumnNames = quickFilters
+          .filter(([columnIndex]) => model.isFilterable(columnIndex))
+          .map(([columnIndex]) => model.columns[columnIndex].name);
+
+        const advancedFilterColumnNames = advancedFilters
+          .filter(([columnIndex]) => model.isFilterable(columnIndex))
+          .map(([columnIndex]) => model.columns[columnIndex].name);
+
+        const skipAggregationOperation: AggregationOperation =
+          IrisGridUtils.getSkipAggregationOperation(
+            model.dh.AggregationOperation
+          );
+
+        // TODO: remove
+        log.debug('[0] [IrisGridPanel] rollupConfig', {
+          quickFilterColumnNames,
+          advancedFilterColumnNames,
+          rollupConfig,
+          aggregationSettings,
+          skipAggregationOperation,
+        });
+
         // originalColumns might change by the time this model queue item is applied.
         // Instead of pushing a static object, push the function
         // that calculates the config based on the updated model state.
@@ -520,7 +546,10 @@ export class IrisGridPanel extends PureComponent<
           m.rollupConfig = IrisGridUtils.getModelRollupConfig(
             m.originalColumns,
             rollupConfig,
-            aggregationSettings
+            aggregationSettings,
+            // TODO: deduplicate
+            [...quickFilterColumnNames, ...advancedFilterColumnNames],
+            skipAggregationOperation
           );
         });
       }

@@ -361,20 +361,17 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
   }
 
   set rollupConfig(rollupConfig: DhType.RollupConfig | null) {
-    log.debug('set rollupConfig', rollupConfig);
+    log.debug('set rollupConfig', rollupConfig, this.filter);
 
     if (!this.isRollupAvailable) {
       throw new Error('Rollup Rows are not available');
     }
 
-    // TODO:
-    // Make sure filters are always applied to the original model, not to the rollup
-    // Check if filters are already set on the model
     // Prevent model update when IrisGridModelUpdater is mounted
     // if rollup is already initialized in IrisGridPanel
-    // if (deepEqual(rollupConfig, this.rollup)) {
-    //   return;
-    // }
+    if (deepEqual(rollupConfig, this.rollup)) {
+      return;
+    }
 
     this.rollup = rollupConfig;
 
@@ -391,14 +388,19 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
     this.setNextModel(modelPromise);
   }
 
-  // TODO: Remove this
   // set filter(filter: DhType.FilterCondition[]) {
-  //   log.debug('[0]', { filter }, this.rollupConfig);
-  //   if (this.rollupConfig != null) {
-  //     this.originalModel.filter = filter;
-  //   } else {
-  //     this.model.filter = filter;
-  //   }
+  //   log.debug('[0]', { filter, columns: this.model.columns });
+  //   // const quickFilterColumnNames = Array.from(filter.keys())
+  //   //     .map(index => columns[index]?.name)
+  //   //     .filter((name): name is string => name != null);
+
+  //   this.model.filter = filter;
+
+  //   // if (this.rollupConfig != null) {
+  //   //   this.originalModel.filter = filter;
+  //   // } else {
+  //   //   this.model.filter = filter;
+  //   // }
   // }
 
   get selectDistinctColumns(): ColumnName[] {
