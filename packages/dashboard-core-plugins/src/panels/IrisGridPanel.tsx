@@ -909,7 +909,10 @@ export class IrisGridPanel extends PureComponent<
       IrisGridUtils.changeFilterColumnNamesToIndexes(
         model.columns,
         advancedFilters
-      ).filter(([columnIndex]) => model.isFilterable(columnIndex));
+      ).filter(
+        ([columnIndex]) =>
+          model.isValuesTableAvailable && model.isFilterable(columnIndex)
+      );
     assertNotNull(this.irisGridUtils);
     irisGrid.clearAllFilters();
     irisGrid.setFilters({

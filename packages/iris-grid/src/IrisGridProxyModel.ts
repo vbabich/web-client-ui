@@ -63,6 +63,10 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
 
   private rollup: DhType.RollupConfig | null;
 
+  // TODO: store the filter here or fix the getter on the model?
+  // Test how it works when adding/removing a rollup and the columns change, including column names, or same names?
+  private modelFilter: DhType.FilterCondition[] = [];
+
   private partition: PartitionConfig | null;
 
   private selectDistinct: ColumnName[];
@@ -195,7 +199,10 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
     }
   }
 
-  setNextModel(modelPromise: Promise<IrisGridModel>): void {
+  setNextModel(
+    modelPromise: Promise<IrisGridModel>,
+    filter: DhType.FilterCondition[] = []
+  ): void {
     log.debug2('setNextModel');
 
     if (this.modelPromise) {
@@ -214,6 +221,7 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
       .then(model => {
         this.modelPromise = null;
         this.setModel(model);
+        this.filter = filter;
       })
       .catch((err: unknown) => {
         if (PromiseUtils.isCanceled(err)) {
@@ -372,14 +380,18 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
       throw new Error('Rollup Rows are not available');
     }
 
-    // TODO:
-    // Make sure filters are always applied to the original model, not to the rollup
-    // Check if filters are already set on the model
     // Prevent model update when IrisGridModelUpdater is mounted
     // if rollup is already initialized in IrisGridPanel
-    // if (deepEqual(rollupConfig, this.rollup)) {
-    //   return;
-    // }
+    if (deepEqual(rollupConfig, this.rollup)) {
+      return;
+    }
+
+    // Store the original filter before setting the rollup
+    let rollupFilter: DhType.FilterCondition[] = [];
+    if (rollupConfig != null) {
+      rollupFilter = Array.from(this.filter ?? []);
+      this.filter = [];
+    }
 
     this.rollup = rollupConfig;
 
@@ -393,16 +405,16 @@ class IrisGridProxyModel extends IrisGridModel implements PartitionedGridModel {
         .rollup(rollupConfig)
         .then(table => makeModel(this.dh, table, this.formatter));
     }
-    this.setNextModel(modelPromise);
+    this.setNextModel(modelPromise, rollupFilter);
   }
 
   set filter(filter: DhType.FilterCondition[]) {
-    log.debug('[0]', { filter }, this.rollupConfig);
-    if (this.rollupConfig != null) {
-      this.originalModel.filter = filter;
-    } else {
-      this.model.filter = filter;
-    }
+    this.modelFilter = filter;
+    this.model.filter = filter;
+  }
+
+  get filter(): readonly DhType.FilterCondition[] {
+    return this.modelFilter;
   }
 
   get selectDistinctColumns(): ColumnName[] {

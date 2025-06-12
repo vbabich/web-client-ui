@@ -3617,7 +3617,6 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     this.resetGridViewState();
     this.showAllColumns();
-    this.clearAllFilters();
 
     this.startLoading(
       `Grouping by columns ${rollupConfig?.columns?.join(', ') ?? ''}...`
@@ -4581,7 +4580,8 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         const columnWidth = allColumnWidths.get(columnIndex);
         const modelColumn = this.getModelColumn(columnIndex);
         if (modelColumn != null) {
-          const isFilterable = model.isFilterable(modelColumn);
+          const isFilterable =
+            model.isValuesTableAvailable && model.isFilterable(modelColumn);
           if (
             isFilterable &&
             columnX != null &&
