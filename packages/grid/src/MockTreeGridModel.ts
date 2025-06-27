@@ -70,7 +70,19 @@ class MockTreeGridModel extends MockGridModel implements ExpandableGridModel {
     return true;
   }
 
+  get hasExpandableColumns(): boolean {
+    return false;
+  }
+
   get isExpandAllAvailable(): boolean {
+    return false;
+  }
+
+  get isExpandAllRowsAvailable(): boolean {
+    return false;
+  }
+
+  get isExpandAllColumnsAvailable(): boolean {
     return false;
   }
 
@@ -82,8 +94,16 @@ class MockTreeGridModel extends MockGridModel implements ExpandableGridModel {
     return this.getCachedIsRowExpandable(this.children, row, this.maxDepth);
   }
 
+  isColumnExpandable(column: ModelIndex): boolean {
+    return false;
+  }
+
   isRowExpanded(row: ModelIndex): boolean {
     return this.getCachedIsRowExpanded(this.children, row);
+  }
+
+  isColumnExpanded(column: ModelIndex): boolean {
+    return false;
   }
 
   setRowExpanded(
@@ -120,6 +140,14 @@ class MockTreeGridModel extends MockGridModel implements ExpandableGridModel {
     this.children = children;
   }
 
+  setColumnExpanded(
+    column: ModelIndex,
+    isExpanded: boolean,
+    expandDescendants = false
+  ): void {
+    throw new Error('Column expansion not implemented.');
+  }
+
   expandAll(): void {
     throw new Error('Expand all not implemented.');
   }
@@ -128,8 +156,28 @@ class MockTreeGridModel extends MockGridModel implements ExpandableGridModel {
     throw new Error('Collapse all not implemented.');
   }
 
+  expandAllRows(): void {
+    throw new Error('Expand all rows not implemented.');
+  }
+
+  collapseAllRows(): void {
+    throw new Error('Collapse all rows not implemented.');
+  }
+
+  expandAllColumns(): void {
+    throw new Error('Expand all columns not implemented.');
+  }
+
+  collapseAllColumns(): void {
+    throw new Error('Collapse all columns not implemented.');
+  }
+
   depthForRow(row: ModelIndex): number {
     return this.getCachedDepthForRow(this.children, row);
+  }
+
+  depthForColumn(column: ModelIndex): number {
+    return 0;
   }
 
   /**

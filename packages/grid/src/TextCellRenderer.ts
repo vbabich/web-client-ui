@@ -23,8 +23,10 @@ class TextCellRenderer extends CellRenderer implements TokenBoxCellRenderer {
       modelRows,
       allRowHeights,
       firstColumn,
+      firstRow,
     } = metrics;
     const isFirstColumn = column === firstColumn;
+    const isFirstRow = row === firstRow;
     const { textColor } = theme;
     const rowHeight = getOrThrow(allRowHeights, row);
     const modelRow = getOrThrow(modelRows, row);
@@ -111,6 +113,14 @@ class TextCellRenderer extends CellRenderer implements TokenBoxCellRenderer {
       model.hasExpandableRows
     ) {
       this.drawCellRowTreeMarker(context, state, row);
+    }
+
+    if (
+      isFirstRow &&
+      isExpandableGridModel(model) &&
+      model.hasExpandableColumns
+    ) {
+      this.drawCellColumnTreeMarker(context, state, column);
     }
   }
 

@@ -24,7 +24,7 @@ class IrisGridRowTreeMouseHandler extends GridMouseHandler {
   }
 
   private setCursor(gridPoint: GridPoint, grid: Grid): EventHandlerResult {
-    if (GridRowTreeMouseHandler.isInTreeBox(gridPoint, grid)) {
+    if (GridRowTreeMouseHandler.isInExpandableRowBox(gridPoint, grid)) {
       this.cursor = 'pointer';
       return { stopPropagation: false, preventDefault: false };
     }
@@ -74,7 +74,7 @@ class IrisGridRowTreeMouseHandler extends GridMouseHandler {
   }
 
   onMove(gridPoint: GridPoint, grid: Grid): EventHandlerResult {
-    if (GridRowTreeMouseHandler.isInTreeBox(gridPoint, grid)) {
+    if (GridRowTreeMouseHandler.isInExpandableRowBox(gridPoint, grid)) {
       const { expandCellTooltipProps } = this.irisGrid.state;
       const { model } = this.irisGrid.props;
       const newProps = this.getButtonPosition(gridPoint);

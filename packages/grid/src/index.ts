@@ -19,6 +19,7 @@ export * from './GridUtils';
 export { default as KeyHandler } from './KeyHandler';
 export { default as MockGridModel } from './MockGridModel';
 export { default as MockTreeGridModel } from './MockTreeGridModel';
+export { default as MockExpandableColumnGridModel } from './MockExpandableColumnGridModel';
 export { default as memoizeClear } from './memoizeClear';
 export { default as StaticDataGridModel } from './StaticDataGridModel';
 export { default as ViewportDataGridModel } from './ViewportDataGridModel';

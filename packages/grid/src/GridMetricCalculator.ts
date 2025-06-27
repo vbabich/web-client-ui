@@ -259,9 +259,16 @@ export class GridMetricCalculator {
       isExpandableGridModel(model) && model.hasExpandableRows
         ? this.calculateTreePaddingX(state)
         : 0;
-    const treePaddingY = 0; // We don't support trees on columns (at least not yet)
+    const treePaddingY =
+      isExpandableGridModel(model) && model.hasExpandableColumns
+        ? this.calculateTreePaddingY(state)
+        : 0;
 
-    const visibleRowHeights = this.getVisibleRowHeights(state);
+    const visibleRowHeights = this.getVisibleRowHeights(
+      state,
+      firstRow,
+      treePaddingY
+    );
     const visibleColumnWidths = this.getVisibleColumnWidths(
       state,
       firstColumn,
@@ -487,6 +494,12 @@ export class GridMetricCalculator {
       state
     );
 
+    const visibleColumnTreeBoxes = this.getVisibleColumnTreeBoxes(
+      allColumnWidths,
+      modelColumns,
+      state
+    );
+
     // Calculate the visible viewport based on scroll position and floating sections
     const topVisible = this.getTopVisible(
       state,
@@ -650,8 +663,9 @@ export class GridMetricCalculator {
       allRowYs,
       allColumnXs,
 
-      // The boxes user can click on for expanding/collapsing tree rows
+      // The boxes user can click on for expanding/collapsing tree rows/columns
       visibleRowTreeBoxes,
+      visibleColumnTreeBoxes,
 
       // Mapping from visible row indexes to the model row/columns they pull from
       modelRows,
@@ -994,9 +1008,15 @@ export class GridMetricCalculator {
   /**
    * Retrieve a map of the height of all the visible rows (non-floating)
    * @param state The grid metric state
+   * @param firstRow The first non-hidden row
+   * @param treePaddingY The amount of padding taken up for the tree expansion buttons
    * @returns The heights of all the visible rows
    */
-  getVisibleRowHeights(state: GridMetricState): SizeMap {
+  getVisibleRowHeights(
+    state: GridMetricState,
+    firstRow: VisibleIndex = this.getFirstRow(state),
+    treePaddingY: number = this.calculateTreePaddingY(state)
+  ): SizeMap {
     const { top, topOffset, height, model } = state;
 
     let y = 0;
@@ -1004,7 +1024,12 @@ export class GridMetricCalculator {
     const rowHeights = new Map();
     const { rowCount, floatingBottomRowCount } = model;
     while (y < height + topOffset && row < rowCount - floatingBottomRowCount) {
-      const rowHeight = this.getVisibleRowHeight(row, state);
+      const rowHeight = this.getVisibleRowHeight(
+        row,
+        state,
+        firstRow,
+        treePaddingY
+      );
       rowHeights.set(row, rowHeight);
       y += rowHeight;
       row += 1;
@@ -1218,6 +1243,52 @@ export class GridMetricCalculator {
     }
 
     return visibleRowTreeBoxes;
+  }
+
+  /**
+   * Calculates the column tree box click areas that are visible. In relation to the columnX/rowY
+   * @param visibleColumnWidths Map of visible index to column width
+   * @param modelColumns Map from visible `Index` to `ModelIndex`
+   * @param state The grid metric state
+   * @returns Coordinates of tree boxes for each column
+   */
+  getVisibleColumnTreeBoxes(
+    visibleColumnWidths: SizeMap,
+    modelColumns: VisibleToModelMap,
+    state: GridMetricState
+  ): Map<VisibleIndex, BoxCoordinates> {
+    const visibleColumnTreeBoxes = new Map();
+    const { model, theme } = state;
+    const { treeDepthIndent, treeHorizontalPadding } = theme;
+
+    if (isExpandableGridModel(model) && model.hasExpandableColumns) {
+      visibleColumnWidths.forEach((columnWidth, column) => {
+        const modelColumn = modelColumns.get(column);
+        if (
+          modelColumn !== undefined &&
+          model.isColumnExpandable(modelColumn)
+        ) {
+          const depth = model.depthForColumn(modelColumn);
+          const columnX = -this.getGridX(state);
+          const x = columnX + depth * treeDepthIndent;
+          const y = -treeHorizontalPadding;
+
+          // Make sure box is square, using the smaller of the available width/height
+          const availableWidth = columnWidth - depth * treeDepthIndent;
+          const availableHeight = columnWidth;
+          const size = Math.min(availableWidth, availableHeight);
+
+          visibleColumnTreeBoxes.set(column, {
+            x1: x,
+            y1: y,
+            x2: x + size,
+            y2: y + size,
+          });
+        }
+      });
+    }
+
+    return visibleColumnTreeBoxes;
   }
 
   /**
@@ -1524,17 +1595,35 @@ export class GridMetricCalculator {
    * @param state The grid metric state
    * @returns The height of the row specified
    */
-  getVisibleRowHeight(row: VisibleIndex, state: GridMetricState): number {
+  getVisibleRowHeight(
+    row: VisibleIndex,
+    state: GridMetricState,
+    firstRow: VisibleIndex = this.getFirstRow(state),
+    treePaddingY: number = this.calculateTreePaddingY(state)
+  ): number {
+    const { model } = state;
     const modelRow = this.getModelRow(row, state);
-    const calculatedHeight = this.calculateRowHeight(row, modelRow, state); // Need to call this so calculated map is always populated
 
-    return this.getVisibleItemSize(modelRow, this.userRowHeights, () => {
-      const initialHeight = this.initialRowHeights.get(modelRow);
-      if (initialHeight !== undefined) {
-        return initialHeight;
+    // Add tree padding only if this is the first visible row and we have expandable columns
+    const isFirstRow = row === firstRow;
+    const needsTreePadding =
+      isFirstRow && isExpandableGridModel(model) && model.hasExpandableColumns;
+
+    // Get the base height from user overrides or calculated values
+    const baseHeight = this.getVisibleItemSize(
+      modelRow,
+      this.userRowHeights,
+      () => {
+        const initialHeight = this.initialRowHeights.get(modelRow);
+        if (initialHeight !== undefined) {
+          return initialHeight;
+        }
+        return this.calculateRowHeight(row, modelRow, state);
       }
-      return calculatedHeight;
-    });
+    );
+
+    // Add the tree padding only to the first row
+    return baseHeight + (needsTreePadding ? treePaddingY : 0);
   }
 
   /**
@@ -1920,6 +2009,29 @@ export class GridMetricCalculator {
   }
 
   /**
+   * The coordinate for where the tree padding should be drawn
+   * @param state The grid metric state
+   * @returns The coordinate for tree padding
+   */
+  calculateTreePaddingY(state: GridMetricState): Coordinate {
+    const { left, model, theme } = state;
+    const { treeDepthIndent } = theme;
+    if (!isExpandableGridModel(model) || !model.hasExpandableColumns) {
+      return 0;
+    }
+    let treePadding = 0;
+
+    // Get the first column to use as reference for depth
+    const modelColumn = this.getModelColumn(left, state);
+    if (model.isColumnExpandable(modelColumn)) {
+      const depth = model.depthForColumn(modelColumn);
+      treePadding = treeDepthIndent * (depth + 1);
+    }
+
+    return treePadding;
+  }
+
+  /**
    * Calculates the lower bound width of a character of the provided font.
    * @param font The font to get the width for
    * @param context The canvas rendering context
@@ -2028,6 +2140,7 @@ export class GridMetricCalculator {
   /**
    * Resets the row height for the specified row to the calculated height
    * @param row The row model index to reset
+  
    */
   resetRowHeight(row: ModelIndex): void {
     // Always use a new instance of the map so any consumer of the metrics knows there has been a change

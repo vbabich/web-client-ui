@@ -21,6 +21,53 @@ abstract class CellRenderer {
     row: VisibleIndex
   ): void;
 
+  drawCellColumnTreeMarker(
+    context: CanvasRenderingContext2D,
+    state: GridRenderState,
+    column: VisibleIndex
+  ): void {
+    const { metrics, model, mouseX, mouseY, theme } = state;
+    const {
+      gridX,
+      gridY,
+      allColumnXs,
+      allColumnWidths,
+      allRowYs,
+      allRowHeights,
+      visibleColumnTreeBoxes,
+    } = metrics;
+    const { treeMarkerColor, treeMarkerHoverColor } = theme;
+    const columnX = getOrThrow(allColumnXs, column);
+    const columnWidth = getOrThrow(allColumnWidths, column);
+    const rowY = getOrThrow(allRowYs, 0);
+    const rowHeight = getOrThrow(allRowHeights, 0);
+
+    if (!isExpandableGridModel(model) || !model.isColumnExpandable(column)) {
+      return;
+    }
+
+    const treeBox = getOrThrow(visibleColumnTreeBoxes, column);
+    const color =
+      mouseX != null &&
+      mouseY != null &&
+      mouseX >= gridX + columnX &&
+      mouseX <= gridX + columnX + columnWidth &&
+      mouseY >= gridY + rowY &&
+      mouseY <= gridY + rowY + rowHeight
+        ? treeMarkerHoverColor
+        : treeMarkerColor;
+
+    this.drawTreeMarker(
+      context,
+      state,
+      columnX,
+      rowY,
+      treeBox,
+      color,
+      model.isColumnExpanded(column)
+    );
+  }
+
   drawCellRowTreeMarker(
     context: CanvasRenderingContext2D,
     state: GridRenderState,

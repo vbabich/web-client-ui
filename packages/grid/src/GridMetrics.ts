@@ -166,6 +166,9 @@ export type GridMetrics = {
   // The boxes user can click on for expanding/collapsing tree rows
   visibleRowTreeBoxes: Map<VisibleIndex, BoxCoordinates>;
 
+  // The boxes user can click on for expanding/collapsing tree columns
+  visibleColumnTreeBoxes: Map<VisibleIndex, BoxCoordinates>;
+
   // Mapping from visible row indexes to the model row/columns they pull from
   modelRows: VisibleToModelMap;
   modelColumns: VisibleToModelMap;

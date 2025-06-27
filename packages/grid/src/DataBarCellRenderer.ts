@@ -87,11 +87,13 @@ class DataBarCellRenderer extends CellRenderer {
       allRowHeights,
       allRowYs,
       firstColumn,
+      firstRow,
       fontWidthsLower,
       fontWidthsUpper,
     } = metrics;
 
     const isFirstColumn = column === firstColumn;
+    const isFirstRow = row === firstRow;
     const rowHeight = getOrThrow(allRowHeights, row);
     const modelRow = getOrThrow(modelRows, row);
     const modelColumn = getOrThrow(modelColumns, column);
@@ -277,6 +279,14 @@ class DataBarCellRenderer extends CellRenderer {
     ) {
       this.drawCellRowTreeMarker(context, state, row);
     }
+    // Draw column tree marker
+    if (
+      isFirstRow &&
+      isExpandableGridModel(model) &&
+      model.hasExpandableColumns
+    ) {
+      this.drawCellColumnTreeMarker(context, state, column);
+    }
   }
 
   getDataBarRenderMetrics(
@@ -313,6 +323,7 @@ class DataBarCellRenderer extends CellRenderer {
       model.hasExpandableRows &&
       isFirstColumn
     ) {
+      // TODO: update for columns
       treeIndent =
         treeDepthIndent * (model.depthForRow(row) + 1) + treeHorizontalPadding;
     }

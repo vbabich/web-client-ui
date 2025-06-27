@@ -128,7 +128,19 @@ class MockIrisGridTreeModel
     return this.model.hasExpandableRows;
   }
 
+  get hasExpandableColumns(): boolean {
+    return false;
+  }
+
   get isExpandAllAvailable(): boolean {
+    return this.isExpandAllRowsAvailable || this.isExpandAllColumnsAvailable;
+  }
+
+  get isExpandAllRowsAvailable(): boolean {
+    return false;
+  }
+
+  get isExpandAllColumnsAvailable(): boolean {
     return false;
   }
 
@@ -148,16 +160,52 @@ class MockIrisGridTreeModel
     this.model.setRowExpanded(row, isExpanded, expandDescendants);
   }
 
+  isColumnExpandable(column: ModelIndex): boolean {
+    return false;
+  }
+
+  isColumnExpanded(column: ModelIndex): boolean {
+    return false;
+  }
+
+  setColumnExpanded(
+    column: ModelIndex,
+    isExpanded: boolean,
+    expandDescendants = false
+  ): void {
+    // No-op in mock implementation
+  }
+
   expandAll(): void {
     throw new Error('Expand all not implemented.');
+  }
+
+  expandAllRows(): void {
+    throw new Error('Expand all rows not implemented.');
   }
 
   collapseAll(): void {
     throw new Error('Collapse all not implemented.');
   }
 
+  collapseAllRows(): void {
+    throw new Error('Collapse all rows not implemented.');
+  }
+
+  expandAllColumns(): void {
+    throw new Error('Expand all columns not implemented.');
+  }
+
+  collapseAllColumns(): void {
+    throw new Error('Collapse all columns not implemented.');
+  }
+
   depthForRow(row: ModelIndex): number {
     return this.model.depthForRow(row);
+  }
+
+  depthForColumn(column: ModelIndex): number {
+    return 0;
   }
 
   // Stub out functions for IrisGridModel functionality

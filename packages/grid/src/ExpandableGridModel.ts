@@ -4,18 +4,30 @@ import { type ModelIndex } from './GridMetrics';
 export function isExpandableGridModel(
   model: GridModel
 ): model is ExpandableGridModel {
-  return (model as ExpandableGridModel)?.hasExpandableRows !== undefined;
+  return (
+    (model as ExpandableGridModel)?.hasExpandableRows !== undefined ||
+    (model as ExpandableGridModel)?.hasExpandableColumns !== undefined
+  );
 }
 
 /**
- * Expandable grid model. Allows for a grid with rows that can expand (e.g. A Tree Table)
+ * Expandable grid model. Allows for a grid with rows and columns that can expand (e.g. a Tree Table, a Rollup)
  */
 export interface ExpandableGridModel extends GridModel {
   /** Whether the grid has rows that can be expanded */
   hasExpandableRows: boolean;
 
-  /** Whether the grid can expand all */
+  /** Whether the grid has columns that can be expanded */
+  hasExpandableColumns: boolean;
+
+  /** Whether the grid can expand all rows and/or columns */
   isExpandAllAvailable: boolean;
+
+  /** Whether the grid can expand all rows */
+  isExpandAllRowsAvailable: boolean;
+
+  /** Whether the grid can expand all columns */
+  isExpandAllColumnsAvailable: boolean;
 
   /**
    * @param row Row to check
@@ -42,14 +54,58 @@ export interface ExpandableGridModel extends GridModel {
   ) => void;
 
   /**
-   * Expand all rows
+   * @param column Column to check
+   * @returns True if the column is expandable
+   */
+  isColumnExpandable: (column: ModelIndex) => boolean;
+
+  /**
+   * @param column Column to check
+   * @returns True if the column is currently expanded
+   */
+  isColumnExpanded: (column: ModelIndex) => boolean;
+
+  /**
+   * Change the expanded status of an expandable column
+   * @param column Column to expand
+   * @param isExpanded True to expand the column, false to collapse
+   * @param expandDescendants True to expand nested columns, false otherwise
+   */
+  setColumnExpanded: (
+    column: ModelIndex,
+    isExpanded: boolean,
+    expandDescendants?: boolean
+  ) => void;
+
+  /**
+   * Expand all rows and columns
    */
   expandAll: () => void;
 
   /**
-   * Collapse all rows
+   * Expand all rows
+   */
+  expandAllRows: () => void;
+
+  /**
+   * Collapse all rows and columns
    */
   collapseAll: () => void;
+
+  /**
+   * Collapse all rows
+   */
+  collapseAllRows: () => void;
+
+  /**
+   * Expand all columns
+   */
+  expandAllColumns: () => void;
+
+  /**
+   * Collapse all columns
+   */
+  collapseAllColumns: () => void;
 
   /**
    * Get the depth of a row (ie. How indented the row should be)
@@ -57,6 +113,13 @@ export interface ExpandableGridModel extends GridModel {
    * @returns Depth of the row
    */
   depthForRow: (row: ModelIndex) => number;
+
+  /**
+   * Get the depth of a column (ie. How indented the column should be)
+   * @param column Column to check
+   * @returns Depth of the column
+   */
+  depthForColumn: (column: ModelIndex) => number;
 }
 
 export default ExpandableGridModel;

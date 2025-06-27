@@ -13,6 +13,7 @@ import MockIrisGridTreeModel from './MockIrisGridTreeModel';
 import StaticExample from './grid-examples/StaticExample';
 import QuadrillionExample from './grid-examples/QuadrillionExample';
 import TreeExample from './grid-examples/TreeExample';
+import ExpandableColumnsExample from './grid-examples/ExpandableColumnsExample';
 import AsyncExample from './grid-examples/AsyncExample';
 import DataBarExample from './grid-examples/DataBarExample';
 import SampleSection from './SampleSection';
@@ -72,6 +73,16 @@ function Grids(): ReactElement {
         <SampleSection name="grids-tree" component={Flex} height={500}>
           <TreeExample />
         </SampleSection>
+
+        <h2 className="ui-title">Expandable Column Grid</h2>
+        <SampleSection
+          name="grids-expandable-columns"
+          component={Flex}
+          height={500}
+        >
+          <ExpandableColumnsExample />
+        </SampleSection>
+
         <h2 className="ui-title">Iris Grid</h2>
         <SampleSection name="grids-iris" component={Flex} height={500}>
           <IrisGrid model={irisGridModel} density="regular" />
