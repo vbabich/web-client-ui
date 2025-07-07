@@ -5,11 +5,15 @@ import GridUtils from './GridUtils';
 import GridColorUtils from './GridColorUtils';
 import { isExpandableGridModel } from './ExpandableGridModel';
 import {
+  type Coordinate,
+  type BoxCoordinates,
+  type VisibleIndex,
+} from './GridMetrics';
+import {
   type GridColor,
   type GridColorWay,
   type NullableGridColor,
 } from './GridTheme';
-import { type Coordinate, type VisibleIndex } from './GridMetrics';
 import { isEditableGridModel } from './EditableGridModel';
 import GridColumnSeparatorMouseHandler from './mouse-handlers/GridColumnSeparatorMouseHandler';
 import { type BoundedAxisRange } from './GridAxisRange';
@@ -1829,12 +1833,40 @@ export class GridRenderer {
     if (rowHeight <= 0) {
       return;
     }
-    const { metrics, model, theme } = state;
-    const { modelRows, rowHeaderWidth } = metrics;
+    const { metrics, model, theme, mouseX, mouseY } = state;
+    const { modelRows, rowHeaderWidth, visibleRowTreeBoxes } = metrics;
+    const { treeMarkerColor, treeMarkerHoverColor, cellHorizontalPadding } =
+      theme;
     const modelRow = getOrThrow(modelRows, row);
-    const x = rowHeaderWidth - theme.cellHorizontalPadding;
+    const x = rowHeaderWidth - cellHorizontalPadding;
     const y = rowY + rowHeight * 0.5;
+
+    // Draw row header text
     context.fillText(model.textForRowHeader(modelRow), x, y);
+
+    // Draw tree marker if expandable
+    if (isExpandableGridModel(model) && model.isRowExpandable(modelRow)) {
+      const treeBox = getOrThrow(visibleRowTreeBoxes, row);
+      const color =
+        mouseX != null &&
+        mouseY != null &&
+        mouseX >= 0 &&
+        mouseX <= rowHeaderWidth &&
+        mouseY >= rowY &&
+        mouseY <= rowY + rowHeight
+          ? treeMarkerHoverColor
+          : treeMarkerColor;
+
+      this.drawTreeMarker(
+        context,
+        state,
+        0,
+        rowY,
+        treeBox,
+        color,
+        model.isRowExpanded(modelRow)
+      );
+    }
   }
 
   drawRowFooters(
@@ -2240,6 +2272,24 @@ export class GridRenderer {
     context.lineTo(x, y + r);
     context.quadraticCurveTo(x, y, x + r, y);
     context.closePath();
+  }
+
+  drawTreeMarker(
+    context: CanvasRenderingContext2D,
+    state: GridRenderState,
+    columnX: Coordinate,
+    rowY: Coordinate,
+    treeBox: BoxCoordinates,
+    color: GridColor,
+    isExpanded: boolean
+  ): void {
+    const { x1, y1, x2, y2 } = treeBox;
+    const markerText = isExpanded ? '⊟' : '⊞';
+    const textX = columnX + (x1 + x2) * 0.5 + 0.5;
+    const textY = rowY + (y1 + y2) * 0.5 + 0.5;
+    context.fillStyle = color;
+    context.textAlign = 'center';
+    context.fillText(markerText, textX, textY);
   }
 
   drawDraggingColumn(

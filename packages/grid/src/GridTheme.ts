@@ -98,6 +98,7 @@ export type GridTheme = {
   // Other tree table metrics
   treeDepthIndent: number;
   treeHorizontalPadding: number;
+  treeVerticalPadding: number;
   treeLineColor: GridColor;
   treeMarkerColor: GridColor;
   treeMarkerHoverColor: GridColor;
@@ -203,6 +204,7 @@ const defaultTheme: GridTheme = Object.freeze({
   maxDepth: 6,
   treeDepthIndent: 10,
   treeHorizontalPadding: 5,
+  treeVerticalPadding: 5,
   treeLineColor: '#888888',
   treeMarkerColor: '#cccccc',
   treeMarkerHoverColor: '#ffffff',

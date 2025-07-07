@@ -1259,7 +1259,7 @@ export class GridMetricCalculator {
   ): Map<VisibleIndex, BoxCoordinates> {
     const visibleColumnTreeBoxes = new Map();
     const { model, theme } = state;
-    const { treeDepthIndent, treeHorizontalPadding } = theme;
+    const { treeDepthIndent, treeVerticalPadding } = theme;
 
     if (isExpandableGridModel(model) && model.hasExpandableColumns) {
       visibleColumnWidths.forEach((columnWidth, column) => {
@@ -1268,22 +1268,15 @@ export class GridMetricCalculator {
           modelColumn !== undefined &&
           model.isColumnExpandable(modelColumn)
         ) {
+          // Position the tree box based on depth
           const depth = model.depthForColumn(modelColumn);
-          const columnX = -this.getGridX(state);
-          const x = columnX + depth * treeDepthIndent;
-          const y = -treeHorizontalPadding;
+          const x1 = 0;
+          const x2 = columnWidth;
+          // Place tree box at the top of the header
+          const y1 = depth * treeDepthIndent + treeVerticalPadding;
+          const y2 = (depth + 1) * treeDepthIndent + treeVerticalPadding;
 
-          // Make sure box is square, using the smaller of the available width/height
-          const availableWidth = columnWidth - depth * treeDepthIndent;
-          const availableHeight = columnWidth;
-          const size = Math.min(availableWidth, availableHeight);
-
-          visibleColumnTreeBoxes.set(column, {
-            x1: x,
-            y1: y,
-            x2: x + size,
-            y2: y + size,
-          });
+          visibleColumnTreeBoxes.set(column, { x1, y1, x2, y2 });
         }
       });
     }
@@ -1990,22 +1983,13 @@ export class GridMetricCalculator {
    * @returns The coordinate for tree padding
    */
   calculateTreePaddingX(state: GridMetricState): Coordinate {
-    const { top, height, model, theme } = state;
-    const { rowHeight, treeDepthIndent } = theme;
+    const { model, theme } = state;
     if (!isExpandableGridModel(model) || !model.hasExpandableRows) {
       return 0;
     }
-    let treePadding = 0;
 
-    const rowsPerPage = height / rowHeight;
-    const bottom = Math.ceil(top + rowsPerPage);
-    for (let row = top; row <= bottom; row += 1) {
-      const modelRow = this.getModelRow(row, state);
-      const depth = model.depthForRow(modelRow);
-      treePadding = Math.max(treePadding, treeDepthIndent * (depth + 1));
-    }
-
-    return treePadding;
+    // For rows, the padding is now handled in the row header
+    return theme.treeHorizontalPadding;
   }
 
   /**
@@ -2014,21 +1998,13 @@ export class GridMetricCalculator {
    * @returns The coordinate for tree padding
    */
   calculateTreePaddingY(state: GridMetricState): Coordinate {
-    const { left, model, theme } = state;
-    const { treeDepthIndent } = theme;
+    const { model, theme } = state;
     if (!isExpandableGridModel(model) || !model.hasExpandableColumns) {
       return 0;
     }
-    let treePadding = 0;
 
-    // Get the first column to use as reference for depth
-    const modelColumn = this.getModelColumn(left, state);
-    if (model.isColumnExpandable(modelColumn)) {
-      const depth = model.depthForColumn(modelColumn);
-      treePadding = treeDepthIndent * (depth + 1);
-    }
-
-    return treePadding;
+    // For columns, the padding is now handled in the column header
+    return theme.treeHorizontalPadding;
   }
 
   /**
