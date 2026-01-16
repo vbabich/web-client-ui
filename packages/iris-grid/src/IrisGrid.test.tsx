@@ -1075,5 +1075,57 @@ describe('Table Options Extensibility', () => {
       );
       expect(component.props.customOptionRenderers).toEqual(renderers);
     });
+
+    it('supports custom Pivot Builder option using extensibility', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const onPivotBuilderSelect = jest.fn();
+
+      // Custom Pivot Builder renderer component
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function PivotBuilderRenderer(): JSX.Element {
+        return <div className="pivot-builder-option">Pivot Builder</div>;
+      }
+
+      // Custom option for Pivot Builder
+      const pivotBuilderOption = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: 'PIVOT_BUILDER' as any,
+        title: 'Pivot Builder',
+        subtitle: 'Create pivot tables',
+        renderComponent: PivotBuilderRenderer,
+        isCustomRendered: true,
+        customData: { action: 'openPivotBuilder' },
+      };
+
+      const renderers = new Map([['PIVOT_BUILDER', PivotBuilderRenderer]]);
+
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={[pivotBuilderOption]}
+          customOptionRenderers={renderers}
+          onCustomTableOptionSelect={option => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if ((option as any).type === 'PIVOT_BUILDER') {
+              onPivotBuilderSelect(option);
+            }
+          }}
+        />
+      );
+
+      const component = ref.current!;
+      expect(component.props.customTableOptions).toContainEqual(
+        pivotBuilderOption
+      );
+      expect(component.props.customOptionRenderers).toEqual(renderers);
+      expect(component.props.onCustomTableOptionSelect).toBeDefined();
+
+      // Verify the callback can be invoked with the custom option
+      component.props.onCustomTableOptionSelect!(pivotBuilderOption);
+      expect(onPivotBuilderSelect).toHaveBeenCalledWith(pivotBuilderOption);
+    });
   });
 });
