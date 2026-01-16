@@ -940,4 +940,140 @@ describe('Table Options Extensibility', () => {
       expect(component.state.openOptions).toContainEqual(builtInOption);
     });
   });
+
+  describe('Custom option rendering (Phase 3)', () => {
+    it('accepts extendedCustomTableOptions with custom rendering components', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const CustomComponent: React.ComponentType<any> = () => (
+        <div>Custom Render</div>
+      );
+      const extendedOptions = [
+        {
+          type: 'CUSTOM_RENDER' as any,
+          title: 'Custom Rendered Option',
+          renderComponent: CustomComponent,
+          customData: { key: 'value' },
+          isCustomRendered: true,
+        },
+      ];
+
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          extendedCustomTableOptions={extendedOptions}
+        />
+      );
+
+      const component = ref.current!;
+      expect(component).toBeDefined();
+      // Props accepted without error
+      expect(component.props.extendedCustomTableOptions).toEqual(
+        extendedOptions
+      );
+    });
+
+    it('accepts customOptionRenderers mapping', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const CustomRenderer: React.ComponentType<any> = () => (
+        <div>Rendered</div>
+      );
+      const renderers = new Map([['CUSTOM_TYPE', CustomRenderer]]);
+
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customOptionRenderers={renderers}
+        />
+      );
+
+      const component = ref.current!;
+      expect(component.props.customOptionRenderers).toEqual(renderers);
+    });
+
+    it('supports combining extendedCustomTableOptions with customTableOptions', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const CustomComponent: React.ComponentType<any> = () => <div>Custom</div>;
+
+      const extendedOptions = [
+        {
+          type: 'EXTENDED_CUSTOM' as any,
+          title: 'Extended Option',
+          renderComponent: CustomComponent,
+          isCustomRendered: true,
+        },
+      ];
+
+      const simpleOptions = [
+        {
+          type: 'SIMPLE_CUSTOM' as any,
+          title: 'Simple Custom Option',
+        },
+      ];
+
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          extendedCustomTableOptions={extendedOptions}
+          customTableOptions={simpleOptions}
+        />
+      );
+
+      const component = ref.current!;
+      expect(component.props.extendedCustomTableOptions).toEqual(
+        extendedOptions
+      );
+      expect(component.props.customTableOptions).toEqual(simpleOptions);
+    });
+
+    it('supports full extensibility with all Phase 3 props combined', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const CustomRenderer: React.ComponentType<any> = () => (
+        <div>Rendered</div>
+      );
+      const renderers = new Map([['CUSTOM_TYPE', CustomRenderer]]);
+      const tableConfig = { chartBuilder: false };
+      const simpleOptions = [{ type: 'SIMPLE' as any, title: 'Simple' }];
+      const extendedOptions = [
+        {
+          type: 'EXTENDED' as any,
+          title: 'Extended',
+          renderComponent: CustomRenderer,
+          isCustomRendered: true,
+        },
+      ];
+      const onSelect = jest.fn();
+
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          tableOptionsConfig={tableConfig}
+          customTableOptions={simpleOptions}
+          onCustomTableOptionSelect={onSelect}
+          extendedCustomTableOptions={extendedOptions}
+          customOptionRenderers={renderers}
+        />
+      );
+
+      const component = ref.current!;
+      expect(component.props.tableOptionsConfig).toEqual(tableConfig);
+      expect(component.props.customTableOptions).toEqual(simpleOptions);
+      expect(component.props.onCustomTableOptionSelect).toEqual(onSelect);
+      expect(component.props.extendedCustomTableOptions).toEqual(
+        extendedOptions
+      );
+      expect(component.props.customOptionRenderers).toEqual(renderers);
+    });
+  });
 });

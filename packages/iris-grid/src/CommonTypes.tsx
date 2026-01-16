@@ -71,6 +71,36 @@ export type TableOptionsConfig = {
   gotoRow?: boolean;
 };
 
+/**
+ * Extended OptionItem that supports custom rendering and metadata.
+ * Extends the base OptionItem with custom properties for rendering logic.
+ */
+export type ExtendedOptionItem = OptionItem & {
+  /** Custom data for rendering context - can store arbitrary properties */
+  customData?: Record<string, unknown>;
+  /** React component to render custom option content */
+  renderComponent?: React.ComponentType<CustomOptionRenderProps>;
+  /** Whether this option shows custom rendered content instead of standard menu item */
+  isCustomRendered?: boolean;
+};
+
+/**
+ * Props passed to custom option rendering components.
+ * Provides context and handlers for custom option rendering.
+ */
+export type CustomOptionRenderProps = {
+  /** The option being rendered */
+  option: ExtendedOptionItem;
+  /** Whether the option is currently active/selected */
+  isActive?: boolean;
+  /** Handler for when option is clicked */
+  onSelect?: () => void;
+  /** Handler for closing the menu after selection */
+  onClose?: () => void;
+  /** Custom data stored on the option */
+  customData?: Record<string, unknown>;
+};
+
 export interface UITotalsTableConfig extends dh.TotalsTableConfig {
   operationOrder: AggregationOperation[];
   showOnTop: boolean;

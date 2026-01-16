@@ -193,6 +193,8 @@ import {
   type ReadonlyAggregationMap,
   type ReadonlyQuickFilterMap,
   type TableOptionsConfig,
+  type ExtendedOptionItem,
+  type CustomOptionRenderProps,
   type UITotalsTableConfig,
 } from './CommonTypes';
 import type ColumnHeaderGroup from './ColumnHeaderGroup';
@@ -400,6 +402,25 @@ export interface IrisGridProps {
    * Useful for handling custom options that don't have their own handlers.
    */
   onCustomTableOptionSelect?: (option: OptionItem) => void;
+
+  /**
+   * Custom option items with extended rendering support.
+   * Allows providing custom React components for rendering option UI.
+   * These items can include renderComponent for custom rendering.
+   */
+  // eslint-disable-next-line react/no-unused-prop-types
+  extendedCustomTableOptions?: readonly ExtendedOptionItem[];
+
+  /**
+   * Map of custom rendering components for table options.
+   * Maps option type identifiers to custom renderer components.
+   * Enables rendering custom UI for specific option types without modifying core component.
+   */
+  // eslint-disable-next-line react/no-unused-prop-types
+  customOptionRenderers?: ReadonlyMap<
+    string,
+    React.ComponentType<CustomOptionRenderProps>
+  >;
 }
 
 export interface IrisGridState {
