@@ -51,6 +51,26 @@ export type OptionItem = {
   onChange?: () => void;
 };
 
+/**
+ * Configuration for controlling which table options are available in the menu.
+ * When a property is explicitly set to false, that option is hidden.
+ * Omitted properties default to true (option is shown).
+ */
+export type TableOptionsConfig = {
+  chartBuilder?: boolean;
+  organizeColumns?: boolean;
+  conditionalFormatting?: boolean;
+  customColumns?: boolean;
+  rollupRows?: boolean;
+  aggregateColumns?: boolean;
+  selectDistinct?: boolean;
+  downloadCsv?: boolean;
+  advancedSettings?: boolean;
+  quickFilters?: boolean;
+  searchBar?: boolean;
+  gotoRow?: boolean;
+};
+
 export interface UITotalsTableConfig extends dh.TotalsTableConfig {
   operationOrder: AggregationOperation[];
   showOnTop: boolean;

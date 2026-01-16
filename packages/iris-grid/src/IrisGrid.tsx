@@ -192,6 +192,7 @@ import {
   type ReadonlyAdvancedFilterMap,
   type ReadonlyAggregationMap,
   type ReadonlyQuickFilterMap,
+  type TableOptionsConfig,
   type UITotalsTableConfig,
 } from './CommonTypes';
 import type ColumnHeaderGroup from './ColumnHeaderGroup';
@@ -379,6 +380,26 @@ export interface IrisGridProps {
   density?: 'compact' | 'regular' | 'spacious';
 
   getMetricCalculator: GetMetricCalculatorType;
+
+  /**
+   * Configuration to control which built-in table options are displayed in the menu.
+   * Properties set to false will hide the corresponding option.
+   * Omitted properties default to true (option is visible).
+   */
+  tableOptionsConfig?: TableOptionsConfig;
+
+  /**
+   * Custom table option items to add to the menu.
+   * These will be appended after the built-in options.
+   */
+  customTableOptions?: readonly OptionItem[];
+
+  /**
+   * Callback invoked when a custom table option is selected.
+   * This is called in addition to any onChange handler on the option itself.
+   * Useful for handling custom options that don't have their own handlers.
+   */
+  onCustomTableOptionSelect?: (option: OptionItem) => void;
 }
 
 export interface IrisGridState {
@@ -1159,81 +1180,104 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       canDownloadCsv: boolean,
       canToggleSearch: boolean,
       showGotoRow: boolean,
-      hasAdvancedSettings: boolean
+      hasAdvancedSettings: boolean,
+      tableOptionsConfig: TableOptionsConfig | undefined,
+      customTableOptions: readonly OptionItem[] | undefined
     ): readonly OptionItem[] => {
       const optionItems: OptionItem[] = [];
-      if (isChartBuilderAvailable) {
+
+      // Determine if each option should be shown (default to true if not specified)
+      const showChartBuilder = tableOptionsConfig?.chartBuilder !== false;
+      const showOrganizeColumns = tableOptionsConfig?.organizeColumns !== false;
+      const showConditionalFormatting =
+        tableOptionsConfig?.conditionalFormatting !== false;
+      const showCustomColumns = tableOptionsConfig?.customColumns !== false;
+      const showRollupRows = tableOptionsConfig?.rollupRows !== false;
+      const showAggregateColumns =
+        tableOptionsConfig?.aggregateColumns !== false;
+      const showSelectDistinct = tableOptionsConfig?.selectDistinct !== false;
+      const showDownloadCsv = tableOptionsConfig?.downloadCsv !== false;
+      const showAdvancedSettings =
+        tableOptionsConfig?.advancedSettings !== false;
+      const showQuickFiltersFromConfig =
+        tableOptionsConfig?.quickFilters !== false;
+      const showSearchBarFromConfig = tableOptionsConfig?.searchBar !== false;
+      const showGotoRowFromConfig = tableOptionsConfig?.gotoRow !== false;
+
+      if (isChartBuilderAvailable && showChartBuilder) {
         optionItems.push({
           type: OptionType.CHART_BUILDER,
           title: 'Chart Builder',
           icon: dhGraphLineUp,
         });
       }
-      if (isOrganizeColumnsAvailable) {
+      if (isOrganizeColumnsAvailable && showOrganizeColumns) {
         optionItems.push({
           type: OptionType.VISIBILITY_ORDERING_BUILDER,
           title: 'Organize Columns',
           icon: dhEye,
         });
       }
-      if (isFormatColumnsAvailable) {
+      if (isFormatColumnsAvailable && showConditionalFormatting) {
         optionItems.push({
           type: OptionType.CONDITIONAL_FORMATTING,
           title: 'Conditional Formatting',
           icon: vsEdit,
         });
       }
-      if (isCustomColumnsAvailable) {
+      if (isCustomColumnsAvailable && showCustomColumns) {
         optionItems.push({
           type: OptionType.CUSTOM_COLUMN_BUILDER,
           title: 'Custom Columns',
           icon: vsSplitHorizontal,
         });
       }
-      if (isRollupAvailable) {
+      if (isRollupAvailable && showRollupRows) {
         optionItems.push({
           type: OptionType.ROLLUP_ROWS,
           title: 'Rollup Rows',
           icon: dhTriangleDownSquare,
         });
       }
-      if (isTotalsAvailable) {
+      if (isTotalsAvailable && showAggregateColumns) {
         optionItems.push({
           type: OptionType.AGGREGATIONS,
           title: 'Aggregate Columns',
           icon: vsSymbolOperator,
         });
       }
-      if (isSelectDistinctAvailable) {
+      if (isSelectDistinctAvailable && showSelectDistinct) {
         optionItems.push({
           type: OptionType.SELECT_DISTINCT,
           title: 'Select Distinct Values',
           icon: vsRuby,
         });
       }
-      if (isExportAvailable && canDownloadCsv) {
+      if (isExportAvailable && canDownloadCsv && showDownloadCsv) {
         optionItems.push({
           type: OptionType.TABLE_EXPORTER,
           title: 'Download CSV',
           icon: vsCloudDownload,
         });
       }
-      if (hasAdvancedSettings) {
+      if (hasAdvancedSettings && showAdvancedSettings) {
         optionItems.push({
           type: OptionType.ADVANCED_SETTINGS,
           title: 'Advanced Settings',
           icon: vsTools,
         });
       }
-      optionItems.push({
-        type: OptionType.QUICK_FILTERS,
-        title: 'Quick Filters',
-        subtitle: toggleFilterBarAction.shortcut.getDisplayText(),
-        icon: vsFilter,
-        isOn: isFilterBarShown,
-        onChange: toggleFilterBarAction.action,
-      });
-      if (canToggleSearch) {
+      if (showQuickFiltersFromConfig) {
+        optionItems.push({
+          type: OptionType.QUICK_FILTERS,
+          title: 'Quick Filters',
+          subtitle: toggleFilterBarAction.shortcut.getDisplayText(),
+          icon: vsFilter,
+          isOn: isFilterBarShown,
+          onChange: toggleFilterBarAction.action,
+        });
+      }
+      if (canToggleSearch && showSearchBarFromConfig) {
         optionItems.push({
           type: OptionType.SEARCH_BAR,
           title: 'Search Bar',
@@ -1243,14 +1287,21 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
           onChange: toggleSearchBarAction.action,
         });
       }
-      optionItems.push({
-        type: OptionType.GOTO,
-        title: 'Go to',
-        subtitle: toggleGotoRowAction.shortcut.getDisplayText(),
-        icon: vsReply,
-        isOn: showGotoRow,
-        onChange: toggleGotoRowAction.action,
-      });
+      if (showGotoRowFromConfig) {
+        optionItems.push({
+          type: OptionType.GOTO,
+          title: 'Go to',
+          subtitle: toggleGotoRowAction.shortcut.getDisplayText(),
+          icon: vsReply,
+          isOn: showGotoRow,
+          onChange: toggleGotoRowAction.action,
+        });
+      }
+
+      // Add custom options after built-in options
+      if (customTableOptions != null && customTableOptions.length > 0) {
+        optionItems.push(...customTableOptions);
+      }
 
       return Object.freeze(optionItems);
     },
@@ -3296,9 +3347,22 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   }
 
   handleMenuSelect(option: OptionItem): void {
-    this.setState(({ openOptions }) => ({
-      openOptions: [...openOptions, option],
-    }));
+    const { customTableOptions, onCustomTableOptionSelect } = this.props;
+
+    // Check if this is a custom option
+    const isCustomOption =
+      customTableOptions != null &&
+      customTableOptions.some(customOption => customOption === option);
+
+    if (isCustomOption && onCustomTableOptionSelect != null) {
+      // Invoke custom option handler
+      onCustomTableOptionSelect(option);
+    } else {
+      // Handle built-in option (original behavior)
+      this.setState(({ openOptions }) => ({
+        openOptions: [...openOptions, option],
+      }));
+    }
   }
 
   handleRequestFailed(event: EventT): void {
@@ -4958,6 +5022,8 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       }
     }
 
+    const { tableOptionsConfig, customTableOptions } = this.props;
+
     const optionItems = this.getCachedOptionItems(
       onCreateChart !== undefined && model.isChartBuilderAvailable,
       model.isCustomColumnsAvailable,
@@ -4975,7 +5041,9 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       canDownloadCsv,
       this.isTableSearchAvailable(),
       isGotoShown,
-      advancedSettings.size > 0
+      advancedSettings.size > 0,
+      tableOptionsConfig,
+      customTableOptions
     );
 
     const hiddenColumns = this.getCachedHiddenColumns(

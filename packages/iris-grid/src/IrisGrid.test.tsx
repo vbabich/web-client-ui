@@ -464,3 +464,480 @@ describe('Advanced Filter', () => {
     }
   );
 });
+
+describe('Table Options Extensibility', () => {
+  const makeTestModel = () => irisGridTestUtils.makeModel();
+
+  describe('tableOptionsConfig prop', () => {
+    it('shows all built-in options by default when tableOptionsConfig is undefined', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      render(<IrisGrid ref={ref} model={model} settings={DEFAULT_SETTINGS} />);
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig - not provided
+        undefined // customTableOptions - not provided
+      );
+
+      // Should have all built-in options available
+      expect(optionItems.length).toBeGreaterThan(8);
+    });
+
+    it('hides options when tableOptionsConfig explicitly sets them to false', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const tableOptionsConfig = {
+        chartBuilder: false,
+        customColumns: false,
+        downloadCsv: false,
+      };
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          tableOptionsConfig={tableOptionsConfig}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        tableOptionsConfig,
+        undefined // customTableOptions
+      );
+
+      // Should not have chart builder, custom columns, or download CSV
+      const typeStrings = optionItems.map(item => item.type);
+      expect(typeStrings).not.toContain('CHART_BUILDER');
+      expect(typeStrings).not.toContain('CUSTOM_COLUMN_BUILDER');
+      expect(typeStrings).not.toContain('TABLE_EXPORTER');
+    });
+
+    it('shows options when tableOptionsConfig explicitly sets them to true', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const tableOptionsConfig = {
+        chartBuilder: true,
+        customColumns: true,
+        downloadCsv: true,
+      };
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          tableOptionsConfig={tableOptionsConfig}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        tableOptionsConfig,
+        undefined // customTableOptions
+      );
+
+      // Should have chart builder, custom columns, and download CSV
+      const typeStrings = optionItems.map(item => item.type);
+      expect(typeStrings).toContain('CHART_BUILDER');
+      expect(typeStrings).toContain('CUSTOM_COLUMN_BUILDER');
+      expect(typeStrings).toContain('TABLE_EXPORTER');
+    });
+
+    it('respects partial configuration with mixed true/false/undefined values', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const tableOptionsConfig = {
+        chartBuilder: false, // explicitly hide
+        customColumns: true, // explicitly show
+        downloadCsv: undefined, // use default (show)
+        // organizeColumns not specified (use default - show)
+      };
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          tableOptionsConfig={tableOptionsConfig}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        tableOptionsConfig,
+        undefined // customTableOptions
+      );
+
+      const typeStrings = optionItems.map(item => item.type);
+      expect(typeStrings).not.toContain('CHART_BUILDER');
+      expect(typeStrings).toContain('CUSTOM_COLUMN_BUILDER');
+      expect(typeStrings).toContain('TABLE_EXPORTER');
+      expect(typeStrings).toContain('VISIBILITY_ORDERING_BUILDER');
+    });
+  });
+
+  describe('customTableOptions prop', () => {
+    it('adds custom options to the menu when customTableOptions prop is provided', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const customOptions = [
+        {
+          type: 'CUSTOM_OPTION_1' as any,
+          title: 'Custom Report',
+          icon: undefined,
+        },
+        {
+          type: 'CUSTOM_OPTION_2' as any,
+          title: 'Export Settings',
+          icon: undefined,
+        },
+      ];
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={customOptions}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig
+        customOptions
+      );
+
+      // Should include custom options
+      expect(optionItems).toContainEqual(customOptions[0]);
+      expect(optionItems).toContainEqual(customOptions[1]);
+    });
+
+    it('appends custom options after built-in options', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const customOptions = [
+        {
+          type: 'CUSTOM_OPTION_1' as any,
+          title: 'Custom Report',
+          icon: undefined,
+        },
+      ];
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={customOptions}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig
+        customOptions
+      );
+
+      // Custom option should be at the end
+      const lastOption = optionItems[optionItems.length - 1];
+      expect(lastOption.title).toBe('Custom Report');
+    });
+
+    it('does not add custom options if customTableOptions is empty', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={[]}
+        />
+      );
+
+      const component = ref.current!;
+      const optionItemsWithEmpty = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig
+        []
+      );
+
+      const optionItemsWithoutCustom = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig
+        undefined
+      );
+
+      expect(optionItemsWithEmpty.length).toBe(optionItemsWithoutCustom.length);
+    });
+  });
+
+  describe('onCustomTableOptionSelect callback', () => {
+    it('invokes onCustomTableOptionSelect when a custom option is selected', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const onCustomTableOptionSelect = jest.fn();
+      const customOptions = [
+        {
+          type: 'CUSTOM_OPTION_1' as any,
+          title: 'Custom Report',
+          icon: undefined,
+        },
+      ];
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={customOptions}
+          onCustomTableOptionSelect={onCustomTableOptionSelect}
+        />
+      );
+
+      const component = ref.current!;
+      component.handleMenuSelect(customOptions[0]);
+
+      expect(onCustomTableOptionSelect).toHaveBeenCalledWith(customOptions[0]);
+      // Should NOT add to openOptions since it's custom
+      expect(component.state.openOptions.length).toBe(0);
+    });
+
+    it('handles built-in options normally when handleMenuSelect is called', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      render(<IrisGrid ref={ref} model={model} settings={DEFAULT_SETTINGS} />);
+
+      const component = ref.current!;
+      const builtInOption = {
+        type: 'CHART_BUILDER' as any,
+        title: 'Chart Builder',
+        icon: undefined,
+      };
+
+      component.handleMenuSelect(builtInOption);
+
+      // Built-in option should be added to openOptions
+      expect(component.state.openOptions).toContainEqual(builtInOption);
+    });
+
+    it('does not invoke callback if onCustomTableOptionSelect is not provided', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      const customOptions = [
+        {
+          type: 'CUSTOM_OPTION_1' as any,
+          title: 'Custom Report',
+          icon: undefined,
+        },
+      ];
+      render(
+        <IrisGrid
+          ref={ref}
+          model={model}
+          settings={DEFAULT_SETTINGS}
+          customTableOptions={customOptions}
+          // onCustomTableOptionSelect not provided
+        />
+      );
+
+      const component = ref.current!;
+      // Should not throw error
+      expect(() => {
+        component.handleMenuSelect(customOptions[0]);
+      }).not.toThrow();
+    });
+  });
+
+  describe('Backward Compatibility', () => {
+    it('renders with all options visible when no new props are provided', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      render(<IrisGrid ref={ref} model={model} settings={DEFAULT_SETTINGS} />);
+
+      const component = ref.current!;
+      const optionItems = component.getCachedOptionItems(
+        true, // isChartBuilderAvailable
+        true, // isCustomColumnsAvailable
+        true, // isFormatColumnsAvailable
+        true, // isOrganizeColumnsAvailable
+        true, // isRollupAvailable
+        true, // isTotalsAvailable
+        true, // isSelectDistinctAvailable
+        true, // isExportAvailable
+        component.toggleFilterBarAction,
+        component.toggleSearchBarAction,
+        component.toggleGotoRowAction,
+        false, // isFilterBarShown
+        false, // showSearchBar
+        true, // canDownloadCsv
+        true, // canToggleSearch
+        false, // showGotoRow
+        true, // hasAdvancedSettings
+        undefined, // tableOptionsConfig - not provided
+        undefined // customTableOptions - not provided
+      );
+
+      // Should have all built-in options
+      const typeStrings = optionItems.map(item => item.type);
+      expect(typeStrings).toContain('CHART_BUILDER');
+      expect(typeStrings).toContain('CUSTOM_COLUMN_BUILDER');
+      expect(typeStrings).toContain('VISIBILITY_ORDERING_BUILDER');
+      expect(typeStrings).toContain('CONDITIONAL_FORMATTING');
+      expect(typeStrings).toContain('ROLLUP_ROWS');
+      expect(typeStrings).toContain('AGGREGATIONS');
+      expect(typeStrings).toContain('SELECT_DISTINCT');
+      expect(typeStrings).toContain('TABLE_EXPORTER');
+    });
+
+    it('existing menu selection behavior works for built-in options', () => {
+      const model = makeTestModel();
+      const ref = React.createRef<IrisGrid>();
+      render(<IrisGrid ref={ref} model={model} settings={DEFAULT_SETTINGS} />);
+
+      const component = ref.current!;
+      const builtInOption = {
+        type: 'CHART_BUILDER' as any,
+        title: 'Chart Builder',
+        icon: undefined,
+      };
+
+      component.handleMenuSelect(builtInOption);
+
+      // Should behave as before - add to openOptions
+      expect(component.state.openOptions).toContainEqual(builtInOption);
+    });
+  });
+});
