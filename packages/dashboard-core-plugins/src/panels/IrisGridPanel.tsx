@@ -48,6 +48,10 @@ import {
   type IrisGridRenderer,
   type MouseHandlersProp,
   type GetMetricCalculatorType,
+  type TableOptionsConfig,
+  type OptionItem,
+  type ExtendedOptionItem,
+  type CustomOptionRenderProps,
 } from '@deephaven/iris-grid';
 import {
   type RowDataMap,
@@ -164,6 +168,24 @@ export interface OwnProps extends DashboardPanelProps {
   renderer?: IrisGridRenderer;
 
   getMetricCalculator?: GetMetricCalculatorType;
+
+  /** Configuration to control visibility of built-in table options */
+  tableOptionsConfig?: TableOptionsConfig;
+
+  /** Custom table options to add to the menu */
+  customTableOptions?: readonly OptionItem[];
+
+  /** Callback when a custom table option is selected */
+  onCustomTableOptionSelect?: (option: OptionItem) => void;
+
+  /** Extended custom options with custom rendering support */
+  extendedCustomTableOptions?: readonly ExtendedOptionItem[];
+
+  /** Map of custom option renderers */
+  customOptionRenderers?: ReadonlyMap<
+    string,
+    React.ComponentType<CustomOptionRenderProps>
+  >;
 }
 
 interface StateProps {
@@ -1152,6 +1174,11 @@ export class IrisGridPanel extends PureComponent<
       settings,
       getMetricCalculator,
       theme,
+      tableOptionsConfig,
+      customTableOptions,
+      onCustomTableOptionSelect,
+      extendedCustomTableOptions,
+      customOptionRenderers,
     } = this.props;
     const {
       advancedFilters,
@@ -1288,6 +1315,11 @@ export class IrisGridPanel extends PureComponent<
             theme={theme}
             columnHeaderGroups={columnHeaderGroups}
             getMetricCalculator={getMetricCalculator}
+            tableOptionsConfig={tableOptionsConfig}
+            customTableOptions={customTableOptions}
+            onCustomTableOptionSelect={onCustomTableOptionSelect}
+            extendedCustomTableOptions={extendedCustomTableOptions}
+            customOptionRenderers={customOptionRenderers}
           >
             {childrenContent}
           </IrisGrid>

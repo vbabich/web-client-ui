@@ -576,9 +576,58 @@ All three phases of Table Options extensibility are now fully implemented and te
 
 **Total Implementation:**
 - **9 modified or created files**
-- **37+ comprehensive test cases**
+- **38+ comprehensive test cases** (including Pivot Builder example)
 - **3 progressive feature phases**
 - **100% backward compatible**
 
 The system is ready for production use with clear upgrade paths for consuming applications.
+
+## Real-World Example: Pivot Builder Option
+
+The following example demonstrates how to add a "Pivot Builder" custom option using the full extensibility system:
+
+```typescript
+// Define the custom renderer component
+function PivotBuilderRenderer(): JSX.Element {
+  return <div className="pivot-builder-option">Pivot Builder</div>;
+}
+
+// Create the custom option with rendering and custom data
+const pivotBuilderOption = {
+  type: 'PIVOT_BUILDER' as any,
+  title: 'Pivot Builder',
+  subtitle: 'Create pivot tables',
+  renderComponent: PivotBuilderRenderer,
+  isCustomRendered: true,
+  customData: { action: 'openPivotBuilder' },
+};
+
+// Register the renderer
+const renderers = new Map([['PIVOT_BUILDER', PivotBuilderRenderer]]);
+
+// Use in IrisGrid
+<IrisGrid
+  model={gridModel}
+  customTableOptions={[pivotBuilderOption]}
+  customOptionRenderers={renderers}
+  onCustomTableOptionSelect={option => {
+    if ((option as any).type === 'PIVOT_BUILDER') {
+      // Handle the Pivot Builder option selection
+      openPivotBuilderDialog(option.customData);
+    }
+  }}
+/>
+```
+
+This example shows:
+- **Phase 1**: Config-based control of visibility (not used here, but available)
+- **Phase 2**: Custom option with callback handling
+- **Phase 3**: Custom rendering component with registry and custom data
+
+### Key Features Demonstrated:
+1. **Custom Renderer**: `PivotBuilderRenderer` displays custom UI
+2. **Custom Data**: Metadata stored with the option for handler logic
+3. **Callback Handler**: `onCustomTableOptionSelect` receives the full option
+4. **Type Safety**: Proper TypeScript handling with `as any` for custom types
+5. **Registry**: Renderer registered in Map for dynamic resolution
 
