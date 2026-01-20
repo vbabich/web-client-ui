@@ -1,0 +1,77 @@
+.pivot-builder-settings {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pivot-builder-header {
+  margin-bottom: 8px;
+}
+
+.pivot-builder-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--dh-color-text);
+}
+
+.pivot-builder-subtitle {
+  font-size: 12px;
+  margin: 0;
+  color: var(--dh-color-text-muted);
+}
+
+.pivot-builder-sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.pivot-builder-section {
+  padding: 16px;
+  border: 1px dashed var(--dh-color-border);
+  border-radius: 4px;
+  background-color: var(--dh-color-bg-secondary);
+}
+
+.section-title {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dh-color-text);
+}
+
+.section-description {
+  margin: 0;
+  font-size: 11px;
+  color: var(--dh-color-text-muted);
+}
+
+.pivot-builder-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pivot-builder-apply-button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--dh-color-primary);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--dh-color-primary-hover);
+  }
+
+  &:active {
+    background-color: var(--dh-color-primary-active);
+  }
+}
