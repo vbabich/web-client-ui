@@ -31,54 +31,35 @@ These changes are prerequisites whichever controllability model wins. Phase 0 is
 
 ## Phase A — Branch "imperative-ref" (controllability model #3)
 
-Expose a stable imperative API via `forwardRef` + `useImperativeHandle`. Plugins hold a ref and call methods to drive the grid; `onStateDidChange` is the read channel.
+Detailed implementation plan: [controllable-iris-grid-state-branch-a-imperative-ref.md](./controllable-iris-grid-state-branch-a-imperative-ref.md).
 
-### Design
+**Summary.** Expose a stable imperative API via `forwardRef` +
+`useImperativeHandle`. Plugins hold an `IrisGridHandle` ref and call
+methods to drive the grid; `onStateDidChange` is the read channel; a
+`useIrisGridState(handle, …)` hook bridges to React.
 
-- Convert `IrisGrid` to a `forwardRef` boundary. The class component stays internal; a thin functional wrapper exposes the imperative handle. Each `applyX` from Phase 0 becomes a method on the handle.
-- Public handle interface: `IrisGridHandle` in a new `packages/iris-grid/src/controllable/IrisGridHandle.ts`. Methods grouped by category from the registry.
-- `IrisGridPanel` exposes `getIrisGridHandle()` and a new `irisGridRef` prop so dashboard plugins / external panels can grab it. `TablePluginProps` gains `irisGrid: IrisGridHandle` (additive; existing `filter` / `fetchColumns` keep working).
-- For external `@deephaven/plugin` (deephaven-plugins repo) consumers, expose `IrisGridHandle` as a new export from `@deephaven/plugin` and ensure the JS ↔ Python bridge serializes method calls (RPC-style) for plugins running server-side. Most plugins will use it from JS so this is mainly a typings concern; document the Python side as out-of-scope here.
-- Two-way state: handle is write-only; state observation continues via `onStateDidChange`. For plugins that need React reactivity, ship a `useIrisGridState(handle, selector)` hook backed by the granular event from Phase 0.
-
-### Pros
-
-- Smallest behavioral change. `IrisGrid` keeps owning its state — no risk of double-source-of-truth bugs.
-- Backward compatible: existing imperative methods just get re-exported through the handle and old direct ref usage keeps working.
-- Easy to RPC-serialize for plugins running outside the browser.
-
-### Cons
-
-- Not idiomatic React; consumers can't simply pass `<IrisGrid sorts={...}>` and expect updates.
-- Requires the `useIrisGridState` hook for any plugin that wants to *display* current grid state.
-- Two channels (imperative write, observable read) is more surface to test.
+- **Pros**: smallest behavioral change; `IrisGrid` keeps owning its state;
+  backward-compatible; easy to RPC-serialize.
+- **Cons**: not idiomatic React (no `<IrisGrid sorts={...}>`); requires a
+  separate read-side hook; two channels (write / observe) to test.
 
 ---
 
 ## Phase B — Branch "expanded-override" (controllability model #4)
 
-Generalize the existing `IrisGridStateOverride` mechanism to cover every field in the registry. Plugins pass a `stateOverrides` object; presence of a key means that field is controlled, absence means uncontrolled (current behavior).
+Detailed implementation plan: [controllable-iris-grid-state-branch-b-expanded-override.md](./controllable-iris-grid-state-branch-b-expanded-override.md).
 
-### Design
+**Summary.** Generalize the existing `IrisGridStateOverride` mechanism to
+cover every field in the registry. Plugins pass `stateOverrides` +
+`onStateOverrideChange` (controlled-component pattern, same contract as
+`<input value onChange>`, lifted to ~30 fields).
 
-- Replace `IrisGridStateOverride` (currently a fixed shape used by metric calc and renderer) with `ControllableIrisGridState`, a `Partial<>` of the registry's field types. Existing override points keep working because they accept the same keys plus more.
-- `IrisGrid` adds two new props: `stateOverrides?: Partial<ControllableIrisGridState>` and `onStateOverrideChange?: (field, value, source) => void`. Internal `applyX` from Phase 0 first calls `onStateOverrideChange`; if the parent doesn't echo the value back into `stateOverrides`, the change is rejected (controlled semantics) — same as `<input value onChange>`.
-- `IrisGridPanel` either (a) passes a `stateOverrides` it owns (replacing the current internal `irisGridStateOverrides` state), or (b) leaves it undefined for fully-uncontrolled mode. Both work; in-tree panel keeps current behavior.
-- [IrisGridPanel.setStateOverrides](../packages/dashboard-core-plugins/src/panels/IrisGridPanel.tsx#L964) (the existing API used by `FilterSetManagerPanel`) becomes a thin shim over the new prop: still accepts `Partial<DehydratedIrisGridState>`, hydrates, and folds into the panel's local override state.
-- For external plugins, expose a new `IrisGridControllerPanel` (or extend `IrisGridPanel` with a `controller` prop) that lifts override state to a plugin-owned reducer. `TablePluginProps` gains `(state, applyOverride)` derived from this.
-- Loop-protection: the `source` flag from Phase 0 means user-driven changes don't ping-pong with the parent's override echo.
-
-### Pros
-
-- Idiomatic React (controlled-component pattern). Plugins can hold state in their own redux/zustand store and just render `<IrisGrid stateOverrides={x} onStateOverrideChange={y}>`.
-- Fits existing override infrastructure (`IrisGridStateOverride`, `IrisGridPanel.setStateOverrides`, `FilterSetManagerPanel`) — these become specializations rather than parallel mechanisms.
-- Plugin state is naturally serializable (it's already a value, not a method invocation).
-
-### Cons
-
-- Larger refactor: every `applyX` must check the controlled flag, and 80 fields × controlled/uncontrolled paths is a lot of branching. Mitigated by a single `useControllable(fieldName)` helper.
-- Performance: passing 30+ override fields each render risks unnecessary re-renders. Need careful memoization ([IrisGridCacheUtils.ts](../packages/iris-grid/src/IrisGridCacheUtils.ts) already exists for this).
-- Some fields are derived (e.g. `searchFilter` from `searchValue + selectedSearchColumns`) — controlled semantics for derived fields are awkward; plan to mark them read-only in the registry.
+- **Pros**: idiomatic React; plugin state naturally serializable; subsumes
+  existing override infrastructure (`IrisGridStateOverride`,
+  `IrisGridPanel.setStateOverrides`, `FilterSetManagerPanel`).
+- **Cons**: larger refactor (controlled/uncontrolled branching across many
+  fields); render-cost requires careful memoization; derived fields
+  (`searchFilter`) need to be excluded.
 
 ---
 
@@ -128,8 +109,10 @@ New files (Phase 0):
 - `packages/iris-grid/src/controllable/IrisGridControlContext.tsx` — context.
 - `packages/iris-grid/src/controllable/Controllable.test.tsx` — conformance suite.
 
-Branch A new file: `packages/iris-grid/src/controllable/IrisGridHandle.ts`.
-Branch B new file: `packages/iris-grid/src/controllable/ControllableIrisGridState.ts`.
+Branch-specific files are listed in the per-branch plans:
+
+- Branch A: [controllable-iris-grid-state-branch-a-imperative-ref.md](./controllable-iris-grid-state-branch-a-imperative-ref.md)
+- Branch B: [controllable-iris-grid-state-branch-b-expanded-override.md](./controllable-iris-grid-state-branch-b-expanded-override.md)
 
 ---
 
