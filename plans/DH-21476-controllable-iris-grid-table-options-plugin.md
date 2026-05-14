@@ -3,7 +3,7 @@
 > **Status**: blocked on the chosen controllability branch landing on `main`.
 > **Owner**: TBD (the plugin lives in `deephaven-plugins/plugins/table-options/`).
 > **Working branch**: `feat/table-options-plugin` in `deephaven-plugins`; framework changes go through PRs in `web-client-ui`.
-> **Depends on**: [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) **and** the winning controllability branch ([A](./controllable-iris-grid-state-branch-a-imperative-ref.md), [B](./controllable-iris-grid-state-branch-b-expanded-override.md), or [C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md)).
+> **Depends on**: [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) **and** the winning controllability branch ([A](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md), [B](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md), or [C](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md)).
 > **Definition of Done**: every `OptionType` in the table below has a working plugin replacement; built-in pages remain available as the default; render-count regression test green; documentation in `deephaven-plugins/plugins/table-options/README.md`.
 > **Quick commands**:
 >
@@ -81,9 +81,9 @@ A plugin that "implements all functionality" must therefore: (a) **render its ow
 ## Branch evaluation
 
 Detailed A-vs-B-vs-C scoring against this consumer is **not** speculated
-here — the spike branches in the [process plan](./controllable-iris-grid-state-process.md)
+here — the spike branches in the [process plan](./DH-21476-controllable-iris-grid-state-process.md)
 produce real numbers that beat any up-front guess. The process plan
-recommends using a smaller [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md)
+recommends using a smaller [Create Pivot plugin](./DH-21476-controllable-iris-grid-create-pivot-plugin.md)
 as the spike consumer (faster signal, no scratch-state hazards). This
 full-sidebar plugin is the **second** consumer, built on top of the
 branch the spikes pick — not an evaluation tool.
@@ -111,7 +111,7 @@ Assumes the framework's Phase 0 has landed and *one* of A/B has been picked. Pla
 
 ### Milestone 0 — Plumbing (1 PR, web-client-ui)
 
-- Land Phase 0 additions from [controllable-iris-grid-state.md](./controllable-iris-grid-state.md): registry, `applyX` normalization, `onStateDidChange`, `IrisGridControlContext`, `modelFactory` prop on panel.
+- Land Phase 0 additions from [DH-21476-controllable-iris-grid-state.md](./DH-21476-controllable-iris-grid-state.md): registry, `applyX` normalization, `onStateDidChange`, `IrisGridControlContext`, `modelFactory` prop on panel.
 - Land the **sidebar-slot extension** described above (`sidebarPages`, `menuItems`, controllable `isMenuShown` + `openOptions`).
 - Add a smoke test: render `<IrisGrid sidebarPages={{}}>` and assert built-in pages still work (regression guard).
 

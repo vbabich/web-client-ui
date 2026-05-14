@@ -1,10 +1,10 @@
 # Plan: Process & Sequencing for Controllable IrisGrid Branches
 
-> Companion to [controllable-iris-grid-state.md](./controllable-iris-grid-state.md)
+> Companion to [DH-21476-controllable-iris-grid-state.md](./DH-21476-controllable-iris-grid-state.md)
 > and the three branch plans:
-> [Branch A — imperative ref](./controllable-iris-grid-state-branch-a-imperative-ref.md),
-> [Branch B — expanded override](./controllable-iris-grid-state-branch-b-expanded-override.md),
-> [Branch C — idiomatic React rewrite](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
+> [Branch A — imperative ref](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md),
+> [Branch B — expanded override](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md),
+> [Branch C — idiomatic React rewrite](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
 >
 > The framework plan defines **what** to build. This plan defines **how
 > to evaluate and sequence the branches** without burning weeks on
@@ -22,13 +22,13 @@ what this plan recommends. The constraint is that each branch is a
 one branch survives the decision meeting and gets re-implemented on
 `main`; the other two get archived.
 
-1. Land [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this)
+1. Land [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this)
    on `main` first (sequential, non-breaking, useful by itself).
 2. Cut **three short-lived spike branches** in parallel — A, B, and a
    feasibility-only C. Different shapes, different time-boxes, all
    running concurrently after Phase 0:
    - **A and B**: 1-2 weeks each, identical scope (3-4 representative
-     fields + the [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md)
+     fields + the [Create Pivot plugin](./DH-21476-controllable-iris-grid-create-pivot-plugin.md)
      as the consumer). Comparable evaluation memos.
    - **C**: 2-3 days, architecture-only (one slice ported, no plugin
      work, no migration). Separate memo answering "is this buildable?"
@@ -77,7 +77,7 @@ Phase 0 is a hard prerequisite for both A and B and is genuinely
 useful by itself. Specifically:
 
 - Controllable-fields registry
-  ([controllable-iris-grid-state.md, Phase 0 #1](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this))
+  ([DH-21476-controllable-iris-grid-state.md, Phase 0 #1](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this))
   — also Branch C's source of truth for `IrisGridState`. Not wasted
   even if C wins.
 - Normalized `applyX(value, source)` mutators (Phase 0 #2) — clean-up
@@ -85,7 +85,7 @@ useful by itself. Specifically:
 - Granular `onStateDidChange` (Phase 0 #3) — additive, opt-in.
 - Sidebar mutations funneled through `applyX` + register `isMenuShown`
   / `openOptions` (Phase 0 #7, the corrected version) — also
-  prerequisite for the [Table Options sidebar plugin plan](./controllable-iris-grid-table-options-plugin.md).
+  prerequisite for the [Table Options sidebar plugin plan](./DH-21476-controllable-iris-grid-table-options-plugin.md).
 
 Ship as a normal series of PRs on `main`. No feature branch. No need
 for branch plans to exist before Phase 0 lands.
@@ -123,7 +123,7 @@ to surface different failure modes:
    `closeSidebar()` (exercises the sidebar-navigation control from
    Phase 0 #7).
 
-Then build the [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md)
+Then build the [Create Pivot plugin](./DH-21476-controllable-iris-grid-create-pivot-plugin.md)
 on top of each spike. That plan was explicitly designed as a minimal
 real consumer; reusing it makes the spikes directly comparable.
 
@@ -179,11 +179,11 @@ So Branch C runs **in parallel with Step 2** but with a different
 shape: feasibility only, not ergonomics.
 
 - **2-3 day design-only spike**, off `main` after Phase 0 lands.
-- Stand up `createIrisGridStore` (Branch C's [Phase C.1](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md#phase-c1--define-the-store))
+- Stand up `createIrisGridStore` (Branch C's [Phase C.1](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md#phase-c1--define-the-store))
   for the same 3-4 fields chosen in Step 2.
 - Port **one slice** (recommend sorts) of the rendering surface to
   function-component shape, behind `IRIS_GRID_V2` flag.
-- Confirm the store-library decision (Branch C's [Phase C.0](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md#phase-c0--decision-store-implementation)).
+- Confirm the store-library decision (Branch C's [Phase C.0](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md#phase-c0--decision-store-implementation)).
 - **No plugin work, no migration, no compat shim.**
 
 Use this to validate the architecture is **buildable**, not to

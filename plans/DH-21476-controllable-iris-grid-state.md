@@ -4,12 +4,12 @@
 > **Owner**: TBD.
 > **Working branch**: ship Phase 0 directly to `main` as a series of
 > non-breaking PRs.
-> **Blocks**: [Branch A](./controllable-iris-grid-state-branch-a-imperative-ref.md),
-> [Branch B](./controllable-iris-grid-state-branch-b-expanded-override.md),
-> [Branch C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md),
-> [Table Options sidebar plugin](./controllable-iris-grid-table-options-plugin.md).
-> **How to execute**: see [process & sequencing plan](./controllable-iris-grid-state-process.md).
-> **Filename**: descriptive slug; rename to `DH-XXXXX-controllable-iris-grid-state.md`
+> **Blocks**: [Branch A](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md),
+> [Branch B](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md),
+> [Branch C](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md),
+> [Table Options sidebar plugin](./DH-21476-controllable-iris-grid-table-options-plugin.md).
+> **How to execute**: see [process & sequencing plan](./DH-21476-controllable-iris-grid-state-process.md).
+> **Filename**: descriptive slug; rename to `DH-XXXXX-DH-21476-controllable-iris-grid-state.md`
 > when a ticket is opened (see [iris/plans/README.md](../../iris/plans/README.md)).
 
 Establish an architectural framework that lets plugins (both in-tree and external `@deephaven/plugin` consumers) drive every meaningful piece of `IrisGrid` state — filters, sorts, column structure, widths, rollup/aggregation/partition, formatting, and UI-transient state. Goal of this plan is the **framework**, not field-by-field migration; that comes later.
@@ -17,7 +17,7 @@ Establish an architectural framework that lets plugins (both in-tree and externa
 ## User decisions captured
 
 - **Use case**: a family of plugins that drive sorts, filters, the underlying model, and the Table Options sidebar contents from the outside — including adding and removing individual sidebar options.
-- **Controllability model**: explore three approaches as time-boxed evaluation spikes — (A) imperative ref API, (B) expanded override mechanism, (C) idiomatic React rewrite. Each lives in its own implementation plan; sequencing is in the [process plan](./controllable-iris-grid-state-process.md).
+- **Controllability model**: explore three approaches as time-boxed evaluation spikes — (A) imperative ref API, (B) expanded override mechanism, (C) idiomatic React rewrite. Each lives in its own implementation plan; sequencing is in the [process plan](./DH-21476-controllable-iris-grid-state-process.md).
 - **Scope**: filters, sorts, column structure, widths/heights/visibility, rollup/aggregation/partition, formatting, UI-transient (sidebar, search bar, gotoRow, filter bar, menus). Out of scope: selection ranges, pending edits.
 - **Compatibility**: soft — deprecate existing API, plan a follow-up major-version cleanup.
 - **Plugin surface**: both in-tree (`dashboard-core-plugins`) and external (`deephaven-plugins/plugins/ui`, grid-toolbar, etc.).
@@ -43,7 +43,7 @@ These changes are prerequisites whichever controllability model wins. Phase 0 is
    - Add `isMenuShown` and `openOptions` (the page stack — [IrisGrid.tsx#L466](../packages/iris-grid/src/IrisGrid.tsx#L466)) to the controllable-fields registry, so the chosen branch automatically exposes sidebar navigation.
    - Document the sidebar-only scratch state that is **excluded** from the registry: `conditionalFormatEditIndex`, `conditionalFormatPreview`, `selectedAggregation`, gotoRow draft fields (`gotoRow`, `gotoValue`, `gotoValueSelectedColumnName`, `gotoValueSelectedFilter`, `gotoValueManuallyChanged`), download progress fields. These belong to specific built-in page components; a replacement plugin owns its own scratch state. Built-in pages must not leak them through `onStateDidChange`.
 
-   The full extraction (parent-owned `IrisGridSidebar` host + `sidebarPages` slot for plugin replacement) is deferred to the [Table Options sidebar plugin plan](./controllable-iris-grid-table-options-plugin.md), where it's the natural first phase on top of the chosen controllability branch.
+   The full extraction (parent-owned `IrisGridSidebar` host + `sidebarPages` slot for plugin replacement) is deferred to the [Table Options sidebar plugin plan](./DH-21476-controllable-iris-grid-table-options-plugin.md), where it's the natural first phase on top of the chosen controllability branch.
 
 ---
 
@@ -85,21 +85,21 @@ npm run test:unit -- --testPathPattern="packages/iris-grid"
 ## Branch summary
 
 Three controllability models are explored as time-boxed evaluation
-spikes (see [process plan](./controllable-iris-grid-state-process.md)).
+spikes (see [process plan](./DH-21476-controllable-iris-grid-state-process.md)).
 Detailed implementation plans live in their own files:
 
-- [Branch A — imperative ref](./controllable-iris-grid-state-branch-a-imperative-ref.md):
+- [Branch A — imperative ref](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md):
   `forwardRef` + `IrisGridHandle`. Smallest change; backward-compatible;
   not idiomatic React.
-- [Branch B — expanded override](./controllable-iris-grid-state-branch-b-expanded-override.md):
+- [Branch B — expanded override](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md):
   controlled-component pattern with `stateOverrides` /
   `onStateOverrideChange`. Idiomatic; medium refactor; perf risk.
-- [Branch C — idiomatic React rewrite](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md):
+- [Branch C — idiomatic React rewrite](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md):
   function-component rewrite over a typed store. Largest scope; breaks
   direct ref consumers; highest ceiling.
 
 Decision flow, evaluation criteria, and convergence are owned by the
-[process plan](./controllable-iris-grid-state-process.md).
+[process plan](./DH-21476-controllable-iris-grid-state-process.md).
 
 ---
 
@@ -126,8 +126,8 @@ New files (Phase 0):
 
 Branch-specific files are listed in the per-branch plans:
 
-- Branch A: [controllable-iris-grid-state-branch-a-imperative-ref.md](./controllable-iris-grid-state-branch-a-imperative-ref.md)
-- Branch B: [controllable-iris-grid-state-branch-b-expanded-override.md](./controllable-iris-grid-state-branch-b-expanded-override.md)
+- Branch A: [DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md)
+- Branch B: [DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md)
 
 ---
 
@@ -140,6 +140,6 @@ Branch-specific files are listed in the per-branch plans:
 
 ## Open framework questions
 
-1. **Python-side reach.** Branch A needs a JSON-RPC layer to drive the grid from Python; Branches B and C serialize naturally. Confirm with the deephaven-plugins team whether driving the grid from Python is a v1 requirement *before* the spike decision in the [process plan](./controllable-iris-grid-state-process.md).
+1. **Python-side reach.** Branch A needs a JSON-RPC layer to drive the grid from Python; Branches B and C serialize naturally. Confirm with the deephaven-plugins team whether driving the grid from Python is a v1 requirement *before* the spike decision in the [process plan](./DH-21476-controllable-iris-grid-state-process.md).
 2. **`children` slot.** Today `<IrisGrid>{children}</IrisGrid>` renders a toolbar. Either keep `children` and document `IrisGridControlContext` as the canonical state-access path for child plugins, or deprecate in favor of an explicit `toolbar` prop. Recommendation: keep `children`, document the context.
 3. **Granular `onStateChange` migration risk.** Replacing the monolithic `onStateChange(state, gridState)` with a granular event is a behavior change for any consumer that diffs the snapshot. Recommendation: ship granular as `onStateDidChange` (new name), keep the old callback for one major. Don't combine them.

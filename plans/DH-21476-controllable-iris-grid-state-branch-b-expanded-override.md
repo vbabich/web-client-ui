@@ -3,11 +3,11 @@
 > **Status**: spike-ready (waiting on Phase 0 to land on `main`).
 > **Owner**: TBD.
 > **Working branch**: `spike/controllable-iris-grid-branch-b` off `main`.
-> **Depends on**: [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
-> **Spike scope**: see [process plan, Step 2](./controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
-> 3-4 representative fields + the [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**, **don't ship `IrisGridControllerPanel`** beyond what the spike consumer needs.
+> **Depends on**: [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
+> **Spike scope**: see [process plan, Step 2](./DH-21476-controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
+> 3-4 representative fields + the [Create Pivot plugin](./DH-21476-controllable-iris-grid-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**, **don't ship `IrisGridControllerPanel`** beyond what the spike consumer needs.
 > **Definition of Done (spike)**: 4 fields wired through `stateOverrides` / `onStateOverrideChange`; loop-protection + memoization passing the dedicated tests in this plan; Create Pivot plugin builds against the spike; one-page evaluation memo committed (LOC, render counts, plugin DX, snapshot churn).
-> **Companion branches**: [Branch A](./controllable-iris-grid-state-branch-a-imperative-ref.md), [Branch C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
+> **Companion branches**: [Branch A](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md), [Branch C](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
 > **Quick commands**:
 >
 > ```bash
@@ -44,10 +44,10 @@ field is **controlled** (parent owns the value); absence means
 
 ## Prerequisites
 
-All seven items of [Phase 0 in the framework plan](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this).
+All seven items of [Phase 0 in the framework plan](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this).
 This branch will not start until Phase 0 lands and is green in CI. The
 full sidebar host extraction (Phase 0 #7) is **not** a prerequisite — it
-is a consumer of this branch (see the [Table Options sidebar plugin plan](./controllable-iris-grid-table-options-plugin.md)).
+is a consumer of this branch (see the [Table Options sidebar plugin plan](./DH-21476-controllable-iris-grid-table-options-plugin.md)).
 With the registry's `isMenuShown` / `openOptions` entries, sidebar
 navigation lifts into `stateOverrides` like any other field.
 
