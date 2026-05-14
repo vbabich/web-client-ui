@@ -1,14 +1,23 @@
 # Plan: Controllable IrisGrid — Branch B (Expanded Override / Controlled Component)
 
-> Branch B of the controllability framework defined in
-> [controllable-iris-grid-state.md](./controllable-iris-grid-state.md). This
-> document is the **detailed implementation plan** for the
-> controlled-component approach. Branch A (imperative ref handle) is
-> documented in [controllable-iris-grid-state-branch-a-imperative-ref.md](./controllable-iris-grid-state-branch-a-imperative-ref.md).
+> **Status**: spike-ready (waiting on Phase 0 to land on `main`).
+> **Owner**: TBD.
+> **Working branch**: `spike/controllable-iris-grid-branch-b` off `main`.
+> **Depends on**: [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
+> **Spike scope**: see [process plan, Step 2](./controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
+> 3-4 representative fields + the [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**, **don't ship `IrisGridControllerPanel`** beyond what the spike consumer needs.
+> **Definition of Done (spike)**: 4 fields wired through `stateOverrides` / `onStateOverrideChange`; loop-protection + memoization passing the dedicated tests in this plan; Create Pivot plugin builds against the spike; one-page evaluation memo committed (LOC, render counts, plugin DX, snapshot churn).
+> **Companion branches**: [Branch A](./controllable-iris-grid-state-branch-a-imperative-ref.md), [Branch C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
+> **Quick commands**:
+>
+> ```bash
+> npm run types
+> npm run test:unit -- --testPathPattern="packages/iris-grid/src/controllable"
+> npm run e2e:headed -- tests/iris-grid-controllable-overrides.spec.ts
+> ```
 >
 > Filename uses a descriptive slug; rename to
-> `DH-XXXXX-controllable-iris-grid-branch-b.md` once a ticket is opened
-> (see [iris/plans/README.md](../../iris/plans/README.md)).
+> `DH-XXXXX-controllable-iris-grid-branch-b.md` once a ticket is opened.
 
 ## Summary
 
@@ -21,40 +30,26 @@ field is **controlled** (parent owns the value); absence means
 **uncontrolled** (current behavior — `IrisGrid` owns it). Same contract as
 `<input value onChange>`, lifted to ~30 fields.
 
-## Goals
+## Branch-specific deltas (vs parent plan)
 
-- Idiomatic React. Plugins can keep state in their own redux/zustand/jotai
-  store and bind it to `<IrisGrid>` declaratively.
-- Naturally serializable plugin state — overrides are values, not method
-  invocations. Removes the need for an RPC layer for Python-side plugins.
-- Subsume the current ad-hoc override surfaces (`IrisGridStateOverride`,
-  `IrisGridPanel.setStateOverrides`, `FilterSetManagerPanel`) into one
-  mechanism.
-- Per-field opt-in: plugins control only what they care about; everything
-  else stays internal and uncontrolled.
-
-## Non-goals
-
-- Removing the imperative class methods on `IrisGrid` — they remain for
-  intra-component use during the deprecation window.
-- A new dehydrate format. We reuse
-  [IrisGridUtils](../packages/iris-grid/src/IrisGridUtils.ts) codecs.
-- Forcing `IrisGridPanel` to lift state. Its default mode stays
-  uncontrolled (no `stateOverrides`), matching current behavior.
+- Idiomatic React. Plugin state binds declaratively; naturally
+  serializable (no RPC layer needed for Python-side plugins).
+- Subsumes the current ad-hoc override surfaces (`IrisGridStateOverride`,
+  `IrisGridPanel.setStateOverrides`, `FilterSetManagerPanel`).
+- Per-field opt-in: plugins control only what they care about.
+- **Out of scope here**: removing imperative class methods (kept for
+  intra-component use during deprecation); a new dehydrate format (reuse
+  [IrisGridUtils](../packages/iris-grid/src/IrisGridUtils.ts) codecs);
+  forcing `IrisGridPanel` to lift state (default mode stays uncontrolled).
 
 ## Prerequisites
 
-All of [Phase 0 in the framework plan](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this):
-
-1. Controllable-fields registry at
-   `packages/iris-grid/src/controllable/ControllableFields.ts`.
-2. Normalized `applyX(value, source)` mutators on `IrisGrid`.
-3. Granular `onStateDidChange(change)` event with `source: 'user' | 'external'`.
-4. Serializable representations per field.
-5. `modelFactory` boundary on `IrisGridPanel`.
-6. `IrisGridControlContext` React context.
-
-This branch will not start until Phase 0 lands and is green in CI.
+All seven items of [Phase 0 in the framework plan](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this).
+This branch will not start until Phase 0 lands and is green in CI. The
+full sidebar host extraction (Phase 0 #7) is **not** a prerequisite — it
+is a consumer of this branch (see the [Table Options sidebar plugin plan](./controllable-iris-grid-table-options-plugin.md)).
+With the registry's `isMenuShown` / `openOptions` entries, sidebar
+navigation lifts into `stateOverrides` like any other field.
 
 ---
 

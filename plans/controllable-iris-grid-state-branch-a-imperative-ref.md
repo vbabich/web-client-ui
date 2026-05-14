@@ -1,14 +1,23 @@
 # Plan: Controllable IrisGrid — Branch A (Imperative Ref API)
 
-> Branch A of the controllability framework defined in
-> [controllable-iris-grid-state.md](./controllable-iris-grid-state.md). This
-> document is the **detailed implementation plan** for the imperative-handle
-> approach. Branch B (controlled-component / expanded override) is documented
-> in [controllable-iris-grid-state-branch-b-expanded-override.md](./controllable-iris-grid-state-branch-b-expanded-override.md).
+> **Status**: spike-ready (waiting on Phase 0 to land on `main`).
+> **Owner**: TBD.
+> **Working branch**: `spike/controllable-iris-grid-branch-a` off `main`.
+> **Depends on**: [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
+> **Spike scope**: see [process plan, Step 2](./controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
+> 3-4 representative fields + the [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**.
+> **Definition of Done (spike)**: 4 fields driven through `IrisGridHandle`; Create Pivot plugin builds against the spike; one-page evaluation memo committed to the spike branch (LOC, render counts, plugin DX, snapshot churn — see process plan).
+> **Companion branches**: [Branch B](./controllable-iris-grid-state-branch-b-expanded-override.md), [Branch C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
+> **Quick commands**:
+>
+> ```bash
+> npm run types
+> npm run test:unit -- --testPathPattern="packages/iris-grid/src/controllable"
+> npm run e2e:headed -- tests/iris-grid-controllable-handle.spec.ts
+> ```
 >
 > Filename uses a descriptive slug; rename to
-> `DH-XXXXX-controllable-iris-grid-branch-a.md` once a ticket is opened (see
-> [iris/plans/README.md](../../iris/plans/README.md)).
+> `DH-XXXXX-controllable-iris-grid-branch-a.md` once a ticket is opened.
 
 ## Summary
 
@@ -23,41 +32,25 @@ duality. The handle is a **write channel**, the granular event is the
 **read channel**, and a thin `useIrisGridState(handle, selector)` hook
 bridges them for React consumers.
 
-## Goals
+## Branch-specific deltas (vs parent plan)
 
 - Smallest behavioral change to `IrisGrid` internals — no inversion of
   state ownership.
-- Backward compatible: existing imperative methods (`setFilters`,
-  `handleRollupChange`, etc.) keep working and are re-exported through the
-  handle as the canonical entry points.
-- Single, typed, stable surface that plugins can depend on without reaching
-  into private class methods.
-- RPC-friendly: every handle method takes serializable args so a future
-  Python-side bridge can JSON-encode the call.
-
-## Non-goals
-
-- Controlled-component semantics (parent owns state). That's Branch B.
-- Migrating individual fields off the legacy `handleX` mutators in this
-  plan — the handle wraps Phase 0's normalized `applyX` mutators; per-field
-  cleanups happen in follow-up plans.
-- Designing a full Python RPC layer. We only ensure the handle's shape
-  doesn't preclude one.
+- Backward compatible: existing imperative methods keep working and are
+  re-exported through the handle as canonical entry points.
+- RPC-friendly: every handle method takes serializable args (typings only;
+  no runtime serializer in scope).
+- **Out of scope here**: controlled-component semantics (Branch B);
+  per-field cleanups beyond the spike list; full Python RPC layer.
 
 ## Prerequisites
 
-All of [Phase 0 in the framework plan](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this):
-
-1. Controllable-fields registry at
-   `packages/iris-grid/src/controllable/ControllableFields.ts`.
-2. Normalized `applyX(value, source)` mutators on `IrisGrid`.
-3. Granular `onStateDidChange(change)` event.
-4. Serializable representations per field (dehydrate codecs in
-   [IrisGridUtils.ts](../packages/iris-grid/src/IrisGridUtils.ts)).
-5. `modelFactory` boundary on `IrisGridPanel` for custom-model plugins.
-6. `IrisGridControlContext` React context.
-
-This branch will not start until Phase 0 lands and is green in CI.
+All seven items of [Phase 0 in the framework plan](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this).
+This branch will not start until Phase 0 lands and is green in CI. The
+sidebar host extraction (Phase 0 #7) is **not** a prerequisite — it is a
+consumer of this branch (see the [Table Options sidebar plugin plan](./controllable-iris-grid-table-options-plugin.md))
+and `openSidebar(option)` / `closeSidebar()` / `setOpenOptions(stack)`
+on the handle are derived automatically from the registered fields.
 
 ---
 

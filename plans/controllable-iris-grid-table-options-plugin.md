@@ -1,8 +1,21 @@
 # Plan: Plugin Replacement of the Table Options Sidebar
 
-> Companion to [controllable-iris-grid-state.md](./controllable-iris-grid-state.md). That plan defines the framework (Phase 0) and two competing controllability models (Branch A imperative-ref vs Branch B expanded-override). This plan stress-tests both branches against a single concrete, demanding consumer: a plugin that replaces **all** built-in Table Options sidebar features. Use it to evaluate which branch to invest in.
+> **Status**: blocked on the chosen controllability branch landing on `main`.
+> **Owner**: TBD (the plugin lives in `deephaven-plugins/plugins/table-options/`).
+> **Working branch**: `feat/table-options-plugin` in `deephaven-plugins`; framework changes go through PRs in `web-client-ui`.
+> **Depends on**: [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) **and** the winning controllability branch ([A](./controllable-iris-grid-state-branch-a-imperative-ref.md), [B](./controllable-iris-grid-state-branch-b-expanded-override.md), or [C](./controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md)).
+> **Definition of Done**: every `OptionType` in the table below has a working plugin replacement; built-in pages remain available as the default; render-count regression test green; documentation in `deephaven-plugins/plugins/table-options/README.md`.
+> **Quick commands**:
 >
-> Filename uses a descriptive slug; rename to `DH-XXXXX-table-options-sidebar-plugin.md` once a ticket is opened (matches the convention in [iris/plans/README.md](../../iris/plans/README.md)).
+> ```bash
+> # web-client-ui side (sidebar slot)
+> npm run test:unit -- --testPathPattern="packages/iris-grid/src/sidebar"
+> # deephaven-plugins side
+> npm run test:unit -- --testPathPattern="plugins/table-options"
+> npm run e2e:docker -- ./tests/table-options.spec.ts --reporter=list
+> ```
+>
+> Filename uses a descriptive slug; rename to `DH-XXXXX-table-options-sidebar-plugin.md` once a ticket is opened.
 
 ## What "Table Options sidebar" means here
 
@@ -43,75 +56,52 @@ A plugin that "implements all functionality" must therefore: (a) **render its ow
 
 ## Required additions to the framework plan
 
-These extend [controllable-iris-grid-state.md](./controllable-iris-grid-state.md), Phase 0:
+**Why this can't ship as a Phase 0 refactor.** The built-in sidebar pages ([RollupRows](../packages/iris-grid/src/sidebar/RollupRows.tsx), [AggregationsBuilder](../packages/iris-grid/src/sidebar/aggregations), [VisibilityOrderingBuilder](../packages/iris-grid/src/sidebar/visibility-ordering-builder), etc.) call `this.handleX` / `this.setState` directly on the `IrisGrid` class. Extracting them into a parent-rendered slot before the controllability framework exists would just turn private state coupling into a tangle of callback props piped across the new boundary — reinventing the very API Branch A or B is supposed to define. So Phase 0 only does the safe pieces (normalize sidebar mutators through `applyX`, register `isMenuShown` / `openOptions` as controllable fields). Full extraction lives **here**, on top of the chosen branch.
 
-1. **Sidebar-slot extension point.** Add a new prop on `IrisGrid`:
+### Phase 1 — Extract the sidebar host (after Branch A or B lands)
+
+1. Create `packages/iris-grid/src/sidebar/IrisGridSidebar.tsx`. It owns the `<Stack>` / `<Page>` rendering and the `OptionType → component` mapping currently inline in [IrisGrid.tsx#L5394](../packages/iris-grid/src/IrisGrid.tsx#L5394) and [getCachedOptionItems](../packages/iris-grid/src/IrisGrid.tsx#L1168). Built-in pages move with it.
+2. Rewrite each built-in page to consume `IrisGridControlContext` for reads/writes instead of receiving private callbacks. With Branch A this means `useIrisGridState` + `handle.applyX`; with Branch B it means props derived from `getEffectiveState()` + `applyOverride`. Either way the page's source of truth is the public framework API — the same one a plugin would use.
+3. `IrisGrid` keeps the toolbar gear button and the menu open/close state (already controllable from Phase 0 #7). It accepts a `renderSidebar?: (defaults: IrisGridSidebarProps) => ReactNode` prop. Default mounts `<IrisGridSidebar {...defaults} />` so behavior is unchanged.
+4. Workspace-level callbacks (`onAdvancedSettingsChange`, `onCreateChart`, CSV worker fetch) flow through `IrisGridControlContext`; they remain callbacks, not state.
+
+### Phase 2 — Plugin replacement surface
+
+1. **Sidebar-slot extension point.** Add to `IrisGridSidebar` (and re-export through `IrisGrid` for ergonomics):
    ```ts
    sidebarPages?: Partial<Record<OptionType, SidebarPageComponent>>;
    menuItems?: (defaults: readonly OptionItem[]) => readonly OptionItem[];
    ```
-   `SidebarPageComponent` is rendered inside the existing `<Page>` ([IrisGrid.tsx#L5400](../packages/iris-grid/src/IrisGrid.tsx#L5400)) and receives the `IrisGridControlContext` from Phase 0 #6. `menuItems` lets the plugin add, remove, or reorder entries. Both default to the current built-ins.
-2. **Open/close as controllable state.** Promote `isMenuShown` and `openOptions` (the page stack) to first-class controllable fields — otherwise a plugin that replaces a page can't programmatically pop back to the menu after applying a change. Today these are `IrisGridState` only ([IrisGrid.tsx#L466](../packages/iris-grid/src/IrisGrid.tsx#L466)); they belong in the registry.
-3. **Sidebar-only state fields.** `conditionalFormatEditIndex`, `conditionalFormatPreview`, `selectedAggregation`, gotoRow draft fields (`gotoRow`, `gotoValue`, `gotoValueSelectedColumnName`, `gotoValueSelectedFilter`, `gotoValueManuallyChanged`), download progress fields. These are scratch state for the built-in sidebar UIs. **Do not** put them in the registry — they're an internal detail of those components. A replacement plugin owns its own scratch state. Document this exclusion in the registry and forbid built-in sidebars from leaking these into `onStateDidChange` events.
-4. **Workspace-level callbacks** (`onAdvancedSettingsChange`, `onCreateChart`, CSV worker fetch). Stay as callbacks, not state. Plugins receive them via the context.
+   `SidebarPageComponent` receives the `IrisGridControlContext` from Phase 0 #6. `menuItems` lets the plugin add, remove, or reorder entries. Both default to the current built-ins.
+2. **Sidebar-only scratch state stays private.** Already excluded from the registry by Phase 0 #7. Replacement plugins own their own scratch state (half-edited conditional formats, gotoRow drafts, etc.) and never round-trip it through `IrisGrid`.
+3. **Workspace-level callbacks** (`onAdvancedSettingsChange`, `onCreateChart`, CSV worker fetch). Still callbacks. Plugins receive them via the context.
 
 ---
 
-## Branch evaluation against this consumer
+## Branch evaluation
 
-### Branch A — imperative-ref handle
+Detailed A-vs-B-vs-C scoring against this consumer is **not** speculated
+here — the spike branches in the [process plan](./controllable-iris-grid-state-process.md)
+produce real numbers that beat any up-front guess. The process plan
+recommends using a smaller [Create Pivot plugin](./controllable-iris-grid-create-pivot-plugin.md)
+as the spike consumer (faster signal, no scratch-state hazards). This
+full-sidebar plugin is the **second** consumer, built on top of the
+branch the spikes pick — not an evaluation tool.
 
-**Plugin shape.** Plugin renders its own React tree inside the `sidebarPages` slot. Each page calls `irisGridHandle.applyRollupConfig(cfg)`, `applyCustomColumns(cols)`, etc. To display current values it uses `useIrisGridState(handle, s => s.rollupConfig)`.
+Key demands this consumer places on the chosen branch (regardless of
+which one wins) — use this list when reviewing the spike memos:
 
-**What works well**
-- Toggle features (`QUICK_FILTERS`, `SEARCH_BAR`, `GOTO`) map cleanly to `handle.toggleX()` calls.
-- Long-running flows (`TABLE_EXPORTER` writes a CSV via a service worker) match imperative semantics — start/cancel/poll is naturally a method.
-- Plugin's internal scratch state (e.g. half-edited conditional format) lives in plugin-owned React state, never ping-pongs through `IrisGrid`.
-- `CHART_BUILDER`'s `onCreateChart` callback works unchanged — handle exposes it as `handle.createChart(settings)`.
-
-**Pain points**
-- **Every page needs both `useIrisGridState` and `apply` calls.** That's ~12 pages × 2 wirings = 24 hookups, each a potential subscription bug.
-- **Visibility/Ordering** mutates `userColumnWidthsByName`, `movedColumns`, `frozenColumns`, and `columnHeaderGroups` together (drag-and-drop). The plugin must batch these to avoid intermediate re-renders. Need `handle.batch(() => { ... })`.
-- **Aggregations editor** opens a sub-page (`AGGREGATION_EDIT`) and needs to know when it's closed to commit. Without controlled `openOptions`, the plugin can't observe the page-stack pop. Phase 0 #2 above is mandatory.
-- **`searchFilter` is derived** from `searchValue + selectedSearchColumns + invertSearchColumns`. The handle must expose either the derived value (read-only) or a single `applySearch(text, cols, invert)` to keep them consistent.
-
-**Net**: workable but verbose. The plugin ends up writing a `useIrisGridStateBindings()` helper to package up "bind this field for read+write" in one line. Perf is fine — only the subscribed fields trigger re-renders.
-
-### Branch B — expanded-override (controlled props)
-
-**Plugin shape.** Plugin owns a redux/zustand store with the full controllable state. Renders `<IrisGridPanel stateOverrides={store} onStateOverrideChange={dispatch} sidebarPages={...} />`. Sidebar pages read from the same store directly.
-
-**What works well**
-- One source of truth. The plugin's store *is* the grid state. No subscription dance.
-- Persistence is trivial: the plugin's store is already serializable, dehydrate via existing codecs.
-- Visibility/Ordering batching is free — store updates are atomic, single re-render per dispatch.
-- `searchFilter` derivation: declare it read-only in the registry; plugin computes it from store inputs the same way the built-in does. One `useSearchFilter(state)` selector shared with `iris-grid`.
-
-**Pain points**
-- **Every controllable field must round-trip** even for fields the plugin doesn't care about (it has to echo them back unchanged). Mitigated by the framework offering `<IrisGridPanel uncontrolledFields={['frozenColumns', …]}>` to opt out per field — but that's extra surface area.
-- **Long-running flows** (`TABLE_EXPORTER`'s download progress) are awkward as controlled state. Either the grid still owns the progress fields (Phase 0 #3 above flags these as "scratch, not registry") and the plugin calls a callback to start the download, or the plugin owns the worker too. Recommend the former.
-- **Sub-page state.** `AGGREGATION_EDIT` opens a child page. With controlled `openOptions`, the plugin dispatches push/pop. With uncontrolled, the grid manages it. Either is fine, but the plugin must pick one and stick with it.
-- **Re-render budget.** The grid's render path is hot (canvas redraw on every state change). Passing 30+ controlled fields means careful memoization at every layer — even one `new Map()` per render in the plugin store can tank perf. The framework must enforce stable references and provide a `useStableSnapshot` helper in `@deephaven/iris-grid`.
-
-**Net**: cleaner architecture, more upfront work to get perf right. Pays off if multiple plugins reuse the controllable contract.
-
-### Side-by-side scoring (this consumer only)
-
-| Concern | Branch A | Branch B |
-| --- | --- | --- |
-| Lines of plugin code (estimated) | ~1.8k | ~1.2k |
-| Lines of `iris-grid` change | ~600 | ~1500 |
-| Atomic multi-field updates | needs `handle.batch()` | free |
-| Long-running flows (CSV download) | natural | awkward; needs callback escape hatch |
-| Persistence to plugin's backend | extra serialization layer | direct |
-| Re-render risk | low (selector-driven) | high without strict memoization |
-| Test surface | 2 channels (write, observe) | 1 (controlled props), but more fields |
-| Python-side reach (deephaven-plugins) | needs RPC layer | natural (values cross the bridge) |
-| Risk of regressions in built-in sidebar | low (built-in path untouched) | medium (every `applyX` gains a controlled branch) |
-
-**Recommendation for *this* consumer**: Branch B is a better structural fit (single source of truth, natural Python reach, atomic updates) **iff** the perf work in Phase 0 is taken seriously. If Phase 0 perf landings slip, Branch A is the safer interim and can co-exist with B later.
-
-This recommendation is consumer-specific. The framework decision in [controllable-iris-grid-state.md](./controllable-iris-grid-state.md) Phase D should weigh other consumers too (linker, FilterSetManager, `simple-pivot`, `ui` pivots).
+- Atomic multi-field updates for visibility/ordering (`movedColumns` +
+  `userColumnWidthsByName` + `frozenColumns` + `columnHeaderGroups`
+  changing together on a drag).
+- Sub-page state for `AGGREGATIONS` → `AGGREGATION_EDIT` and
+  `CONDITIONAL_FORMATTING` → `_EDIT` via the controllable `openOptions`
+  page stack.
+- Long-running flow escape hatch for `TABLE_EXPORTER` (download progress
+  is grid-owned, not a controlled field).
+- Stable-reference memoization: a 30-field round-trip on every render
+  must not retrigger model fetches.
+- Derived-field handling: `searchFilter` is read-only in the registry.
 
 ---
 
@@ -172,15 +162,3 @@ Each step: plugin page + state binding + Jest test + one Playwright e2e. After e
 1. **Plugin granularity.** One plugin replacing all 12 features, or 12 small plugins each owning one `OptionType`? Recommendation: one package exposing 12 React components; the plugin host wires them in via `sidebarPages`. Leaves room for users to mix-and-match later.
 2. **Ownership of `IrisGridPanel`.** Does the new plugin replace `IrisGridPanel` entirely (its own dashboard panel that wraps `IrisGrid` directly) or extend it via a registration hook? Recommendation: extend. Replacing the panel duplicates dehydrate/hydrate / linker / panel-state / context-menu wiring, all of which is non-trivial. A registration hook keeps that surface DRY.
 3. **Backward compatibility window.** When the plugin is in use, the built-in sidebar is dead code for that grid. Should we (a) keep both code paths forever, (b) make the built-ins themselves consume the same `sidebarPages` API as a default registration, so there's only one path? Recommendation: (b) — converge the built-ins onto the same plugin contract as part of Milestone 0. Risk: bigger M0 PR. Reward: no two-path drift.
-
----
-
-## Decision checkpoint
-
-Run Milestones 0–2 on **both** branches in parallel feature flags (matches the parallel-branch strategy of the framework plan). Compare:
-
-- Implementation effort for the toggles (smallest functional slice).
-- Render-count under a 1k-row stress test with the plugin mounted.
-- DX of binding a single page (lines of plugin code, mental model).
-
-Pick the winner before starting Milestone 3, since Milestone 3 is where the cost diverges sharply.

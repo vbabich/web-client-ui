@@ -1,6 +1,25 @@
 # Plan: JS-only "Create Pivot" Plugin in Table Options
 
-> Companion to [controllable-iris-grid-state.md](./controllable-iris-grid-state.md) and [controllable-iris-grid-table-options-plugin.md](./controllable-iris-grid-table-options-plugin.md). This plan covers a **narrow, single-purpose** JS-only plugin that adds *one* new entry to the Table Options menu — "Create Pivot" — and uses it to evaluate Branches A and B from the framework plan against a much smaller consumer than the full sidebar replacement.
+> **Status**: ready to start in parallel with the spike branches — this
+> plugin is the **shared spike consumer** referenced by the
+> [process plan, Step 2](./controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed).
+> **Owner**: TBD (plugin lives in `deephaven-plugins/plugins/create-pivot/`).
+> **Working branch**: `feat/create-pivot-plugin` in `deephaven-plugins`;
+> framework slice (sidebar slot + optional `useSessionVariablesByType`)
+> ships from a separate PR in `web-client-ui`.
+> **Depends on**: a small slice of [Phase 0](./controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) (sidebar slot extension + `IrisGridControlContext` exposing `model`); coordination with the PivotService team for the type string and `createPivot` signature.
+> **Blocks / unblocks**: the spike memos for [Branch A](./controllable-iris-grid-state-branch-a-imperative-ref.md) and [Branch B](./controllable-iris-grid-state-branch-b-expanded-override.md) consume this plugin as their evaluation harness; build it as **branch-agnostic** so the same plugin code runs against both spikes with one import swap.
+> **Definition of Done**: "Create Pivot" entry appears in Table Options on flat tables, enabled when a `PivotService` is reachable; submit calls `pivotService.createPivot(...)` and opens the resulting widget; full Jest + one Playwright suite green; documented in the plugin's README.
+> **Quick commands**:
+>
+> ```bash
+> # web-client-ui side (sidebar slot + helper hook)
+> npm run test:unit -- --testPathPattern="packages/(iris-grid/src/sidebar|jsapi-utils)"
+> # deephaven-plugins side
+> python tools/plugin_builder.py --reinstall create-pivot   # only on Python/version changes; JS-only changes hot-reload
+> npm run test:unit -- --testPathPattern="plugins/create-pivot"
+> npm run e2e:docker -- ./tests/create-pivot.spec.ts --reporter=list
+> ```
 >
 > Filename uses a descriptive slug; rename to `DH-XXXXX-create-pivot-plugin.md` once a ticket is opened.
 
@@ -51,52 +70,24 @@ This plugin is much smaller than the sidebar-replacement consumer in the compani
      ```
      Implementation calls `subscribeToFieldUpdates`, accumulates current variables matching `type`, and (when `opts.querySerial` is provided **and** the variable definitions carry one — DHE only) narrows to that query. OSS callers omit `querySerial`; DHE callers pass it through and degrade gracefully if `querySerial` is missing on the discovered definitions.
    - DHE-specific narrowing: pass `model.table.getAttributes?.querySerial` (or whatever the canonical accessor turns out to be — verify in iris) into the helper. **Do not import any DHE-only package from this plugin** — stay on the public OSS API plus feature detection.
-4. **Nothing else.** This plugin does not write to any controllable field, so the A-vs-B distinction barely matters for state plumbing. The evaluation below shows where it *does* matter.
-4. **Nothing else.** This plugin does not write to any controllable field, so the A-vs-B distinction barely matters for state plumbing. The evaluation below shows where it *does* matter.
+4. **Nothing else.** This plugin does not write to any controllable field, so the A-vs-B distinction barely matters for state plumbing. Build it branch-agnostic; the spike memos use it as their plugin-DX harness.
 
 ---
 
-## Branch evaluation (this consumer)
+## Branch implications (short)
 
-This consumer is deliberately small. The question is not "which branch makes this easier" — both make it about the same — but "which branch leaves the plugin better positioned if it grows."
+Both Branches A and B handle this consumer with comparable plugin code
+(~400 lines either way) because the plugin is read-only against the
+grid. Branch C — if it wins — lets the same plugin shrink slightly
+(one hook for everything) but does not change the API surface this
+plugin uses. **Build the plugin once against Phase 0 + the existing
+`subscribeToFieldUpdates` primitive; rebind the read path with a
+one-line import swap whichever branch is picked.**
 
-### Branch A — imperative-ref handle
-
-**How the plugin uses it.** The plugin reads `model.columns` from `TablePluginProps.model` (no handle needed for that). It does not call any `apply*` method on `IrisGridHandle` — it has nothing to write. The handle is essentially unused.
-
-**Pros**
-- Zero coupling to the controllable-state machinery. The plugin is a pure read + side-effect (call `pivotService.createPivot`) consumer. Branch A is the lower-overhead choice when nothing needs to be controlled.
-- If the plugin later wants to *react* to grid state changes (e.g. disable "Create Pivot" while the grid is loading), `useIrisGridState(handle, s => s.loadingSpinnerShown)` is a one-liner.
-- No re-render risk — the plugin doesn't subscribe to anything by default.
-
-**Cons**
-- If we later want the plugin to **prefill** rows/cols from current sorts or grouped columns, the plugin must subscribe via `useIrisGridState` and the plugin's form ends up double-rendering each time the user touches the grid. Manageable but easy to get wrong.
-
-### Branch B — expanded-override (controlled props)
-
-**How the plugin uses it.** Same as Branch A — reads `model.columns`, calls `pivotService.createPivot`. The plugin never sets `stateOverrides`, so the grid stays in fully-uncontrolled mode for it.
-
-**Pros**
-- If the plugin grows to *write* to the grid (e.g. "Hide pivoted columns from the source after creating the pivot"), it can dispatch a single override (`movedColumns` + `userColumnWidthsByName`) atomically. With Branch A the plugin would need `handle.batch()`.
-- Plugin's own form state is plain React state — same as Branch A.
-
-**Cons**
-- The grid still pays the controlled-prop machinery cost on every render even though the plugin never overrides anything. Mitigated if the framework treats absent overrides as a no-cost path (the recommendation in the framework plan).
-
-### Side-by-side scoring (this consumer only)
-
-| Concern | Branch A | Branch B |
-| --- | --- | --- |
-| Lines of plugin code | ~400 | ~400 |
-| Lines of `iris-grid` change required *for this plugin* | none (uses framework's existing Phase 0) | none (same) |
-| Reading current grid state | trivial (`useIrisGridState` if needed) | trivial (props or context) |
-| Writing back to the grid (future) | needs `handle.batch()` for atomic | natural |
-| Discovery API (`subscribeToFieldUpdates`, edition-agnostic) | independent of branch — same change | same |
-| Risk of regressing the source grid | very low (no writes) | very low (no overrides) |
-
-**Recommendation for *this* consumer**: branch choice is a **tie**. Both branches need the same minimal additions: the sidebar-slot extension and (optionally) a thin `useSessionVariablesByType` helper. If the team has not yet committed to A or B, this plugin can be built today against just Phase 0 + the existing `subscribeToFieldUpdates` primitive and rebound to whichever wins later. **Build it as a Branch-agnostic plugin.**
-
-This consumer is a useful "control": its DX should not change much between A and B. If it does, the framework has leaked too much complexity into the basic case.
+The full A-vs-B comparison the spike memos produce will use this
+plugin's actual development time and re-render counts as data points,
+so keep the implementation faithful to what a real plugin author would
+write (no special-case shortcuts).
 
 ---
 
