@@ -98,6 +98,16 @@ import throttle from 'lodash.throttle';
 import debounce from 'lodash.debounce';
 import clamp from 'lodash.clamp';
 import {
+  CONTROLLABLE_FIELDS,
+  IrisGridControlContext,
+  type ControllableFieldName,
+  type ControllableFieldValue,
+  type ControllableSource,
+  type IrisGridControlHandle,
+  type IrisGridStateChange,
+  type IrisGridStateChangeListener,
+} from './controllable';
+import {
   type FormattingRule as SidebarFormattingRule,
   getFormatColumns,
 } from './sidebar/conditional-formatting/ConditionalFormattingUtils';
@@ -307,7 +317,20 @@ export interface IrisGridProps {
   onColumnSelected: (column: DhType.Column) => void;
   onError: (error: unknown) => void;
   onDataSelected: (index: ModelIndex, map: RowDataMap) => void;
+  /**
+   * Legacy callback. Fires the entire `IrisGridState` snapshot after
+   * any change. Kept for backwards compatibility — prefer
+   * `onStateDidChange`, which is granular and source-tagged.
+   */
   onStateChange: (irisGridState: IrisGridState, gridState: GridState) => void;
+  /**
+   * Phase 0 controllable-state change event. Fires once per registered
+   * field whose value changed via the canonical `applyState` pipe.
+   * Source is `'user'` for internal handlers and `'external'` for
+   * writes coming from `IrisGridControlContext.apply`. See
+   * `controllable/ControllableFields.ts` for the registry.
+   */
+  onStateDidChange?: (change: IrisGridStateChange) => void;
   onAdvancedSettingsChange: AdvancedSettingsMenuCallback;
 
   /** @deprecated use `partitionConfig` instead */
@@ -526,6 +549,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     onDataSelected: (): void => undefined,
     onError: (): void => undefined,
     onStateChange: (): void => undefined,
+    onStateDidChange: undefined,
     onAdvancedSettingsChange: (): void => undefined,
     partitions: undefined,
     partitionConfig: undefined,
@@ -1054,6 +1078,19 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   }
 
   grid: Grid | null;
+
+  /**
+   * Phase 0: granular state-change listeners registered through
+   * `IrisGridControlContext.subscribe`. Fired from the canonical
+   * `applyState` pipe in addition to the legacy `onStateChange` prop.
+   */
+  private stateChangeListeners: Set<IrisGridStateChangeListener> = new Set();
+
+  /**
+   * Lazily-built control handle exposed via `IrisGridControlContext`.
+   * Memoized so descendants can use referential equality.
+   */
+  private cachedControlHandle: IrisGridControlHandle | null = null;
 
   lastFocusedFilterBarColumn?: number;
 
@@ -2982,14 +3019,17 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     const { isGotoShown } = this.state;
     if (row || value) {
       // if invoked with a row, keep open instead of toggle
-      this.setState({
-        isGotoShown: true,
-        gotoValue: value,
-        gotoValueSelectedColumnName: columnName,
-        gotoRowError: '',
-        gotoValueError: '',
-        gotoValueManuallyChanged: false,
-      });
+      this.setState(
+        {
+          isGotoShown: true,
+          gotoValue: value,
+          gotoValueSelectedColumnName: columnName,
+          gotoRowError: '',
+          gotoValueError: '',
+          gotoValueManuallyChanged: false,
+        },
+        () => this.notifyStateChange('isGotoShown', true, isGotoShown)
+      );
       this.focusRowInGrid(row);
       this.gotoRowRef.current?.focus();
       return;
@@ -3000,14 +3040,18 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     if (cursorRow == null || cursorColumn == null) {
       // if a cell is not selected / grid is not rendered
-      this.setState({
-        isGotoShown: !isGotoShown,
-        gotoRow: '',
-        gotoValue: '',
-        gotoRowError: '',
-        gotoValueError: '',
-        gotoValueManuallyChanged: false,
-      });
+      const next = !isGotoShown;
+      this.setState(
+        {
+          isGotoShown: next,
+          gotoRow: '',
+          gotoValue: '',
+          gotoRowError: '',
+          gotoValueError: '',
+          gotoValueManuallyChanged: false,
+        },
+        () => this.notifyStateChange('isGotoShown', next, isGotoShown)
+      );
       return;
     }
     // if a row is selected
@@ -3016,15 +3060,19 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     // Use raw value (same as Copy Cell Unformatted) to preserve full precision and timezone
     const text = String(this.getValueForCell(cursorColumn, cursorRow, true));
-    this.setState({
-      isGotoShown: !isGotoShown,
-      gotoRow: `${cursorRow + 1}`,
-      gotoValue: text,
-      gotoValueSelectedColumnName: name,
-      gotoRowError: '',
-      gotoValueError: '',
-      gotoValueManuallyChanged: false,
-    });
+    const next = !isGotoShown;
+    this.setState(
+      {
+        isGotoShown: next,
+        gotoRow: `${cursorRow + 1}`,
+        gotoValue: text,
+        gotoValueSelectedColumnName: name,
+        gotoRowError: '',
+        gotoValueError: '',
+        gotoValueManuallyChanged: false,
+      },
+      () => this.notifyStateChange('isGotoShown', next, isGotoShown)
+    );
   }
 
   async commitPending(): Promise<void> {
@@ -3306,25 +3354,25 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   handleMenu(e: React.MouseEvent<HTMLButtonElement>): void {
     e.stopPropagation();
-    this.setState({ isMenuShown: true });
+    this.applyState('isMenuShown', true);
   }
 
   handleMenuClose(): void {
-    this.setState({ isMenuShown: false, openOptions: [] });
+    // Two registered fields change at once; emit both events so
+    // external observers can react to either.
+    this.applyState('openOptions', EMPTY_ARRAY as readonly OptionItem[]);
+    this.applyState('isMenuShown', false);
   }
 
   handleMenuBack(): void {
-    this.setState(({ openOptions }) => {
-      const newOptions = [...openOptions];
-      newOptions.pop();
-      return { openOptions: newOptions };
-    });
+    const { openOptions } = this.state;
+    const newOptions = openOptions.slice(0, -1);
+    this.applyState('openOptions', newOptions);
   }
 
   handleMenuSelect(option: OptionItem): void {
-    this.setState(({ openOptions }) => ({
-      openOptions: [...openOptions, option],
-    }));
+    const { openOptions } = this.state;
+    this.applyState('openOptions', [...openOptions, option]);
   }
 
   handleRequestFailed(event: EventT): void {
@@ -3497,35 +3545,43 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   handleConditionalFormatCreate(): void {
     log.debug('Create new conditional format');
     const { openOptions, conditionalFormats } = this.state;
-    this.setState({
-      openOptions: [
-        ...openOptions,
-        {
-          type: OptionType.CONDITIONAL_FORMATTING_EDIT,
-          title: `Create Formatting Rule`,
-        },
-      ],
-      conditionalFormatEditIndex: conditionalFormats.length,
-      // Start with a blank rule
-      conditionalFormatPreview: undefined,
-    });
+    const newOpenOptions = [
+      ...openOptions,
+      {
+        type: OptionType.CONDITIONAL_FORMATTING_EDIT,
+        title: `Create Formatting Rule`,
+      },
+    ];
+    this.setState(
+      {
+        openOptions: newOpenOptions,
+        conditionalFormatEditIndex: conditionalFormats.length,
+        // Start with a blank rule
+        conditionalFormatPreview: undefined,
+      },
+      () => this.notifyStateChange('openOptions', newOpenOptions, openOptions)
+    );
   }
 
   handleConditionalFormatEdit(index: number): void {
     log.debug('Edit conditional format', index);
     const { openOptions, conditionalFormats } = this.state;
-    this.setState({
-      openOptions: [
-        ...openOptions,
-        {
-          type: OptionType.CONDITIONAL_FORMATTING_EDIT,
-          title: `Edit Formatting Rule`,
-        },
-      ],
-      conditionalFormatEditIndex: index,
-      // Clone rule to preview temporary changes
-      conditionalFormatPreview: { ...conditionalFormats[index] },
-    });
+    const newOpenOptions = [
+      ...openOptions,
+      {
+        type: OptionType.CONDITIONAL_FORMATTING_EDIT,
+        title: `Edit Formatting Rule`,
+      },
+    ];
+    this.setState(
+      {
+        openOptions: newOpenOptions,
+        conditionalFormatEditIndex: index,
+        // Clone rule to preview temporary changes
+        conditionalFormatPreview: { ...conditionalFormats[index] },
+      },
+      () => this.notifyStateChange('openOptions', newOpenOptions, openOptions)
+    );
   }
 
   // Apply live changes
@@ -3800,17 +3856,21 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     log.debug('handleAggregationEdit', aggregation);
 
     const { openOptions } = this.state;
+    const newOpenOptions = [
+      ...openOptions,
+      {
+        type: OptionType.AGGREGATION_EDIT,
+        title: `Edit Columns to ${aggregation.operation}`,
+      },
+    ];
 
-    this.setState({
-      openOptions: [
-        ...openOptions,
-        {
-          type: OptionType.AGGREGATION_EDIT,
-          title: `Edit Columns to ${aggregation.operation}`,
-        },
-      ],
-      selectedAggregation: aggregation,
-    });
+    this.setState(
+      {
+        openOptions: newOpenOptions,
+        selectedAggregation: aggregation,
+      },
+      () => this.notifyStateChange('openOptions', newOpenOptions, openOptions)
+    );
   }
 
   handleRollupChange(rollupConfig: UIRollupConfig): void {
@@ -4178,6 +4238,118 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     const { onStateChange } = this.props;
 
     onStateChange(irisGridState, gridState);
+  }
+
+  /**
+   * Phase 0 canonical mutator. Wraps `setState` for a single
+   * registered controllable field, tags the change with its source,
+   * and fans the change out to:
+   *   - the new `onStateDidChange` prop
+   *   - any listeners registered through `IrisGridControlContext`
+   *
+   * Internal handlers should call `applyState(field, value, 'user')`
+   * instead of `this.setState({ [field]: value })`. External writes
+   * coming through `IrisGridControlContext.apply` always tag the
+   * change with `'external'`.
+   *
+   * Multi-field setStates inside one transaction are intentionally
+   * NOT supported here \u2014 they should remain as targeted
+   * `this.setState` calls. The canonical pipe is per-field on
+   * purpose so the granular event stream stays one-change-per-event.
+   */
+  applyState<K extends ControllableFieldName>(
+    field: K,
+    value: ControllableFieldValue<K>,
+    source: ControllableSource = 'user',
+    callback?: () => void
+  ): void {
+    if (CONTROLLABLE_FIELDS[field] == null) {
+      log.warn(
+        `applyState called for unregistered field "${field}"; ` +
+          'add it to CONTROLLABLE_FIELDS or call setState directly.'
+      );
+    }
+    const prev = this.state[field];
+    // Cast required because TS can't narrow Pick<State, K> from a
+    // dynamic key without an explicit assertion.
+    const partial = { [field]: value } as unknown as Pick<IrisGridState, K>;
+    this.setState(partial, () => {
+      this.notifyStateChange(field, value, prev, source);
+      callback?.();
+    });
+  }
+
+  /**
+   * Phase 0: fire `onStateDidChange` plus subscribed listeners for a
+   * single field. Public-but-internal escape hatch for handlers that
+   * must `setState` multiple fields in one transaction (e.g.
+   * `openOptions` paired with sidebar-only scratch state). Use
+   * `applyState` for single-field updates.
+   *
+   * Fires unconditionally \u2014 callers that want to skip noops should
+   * pre-check `value === prev`.
+   */
+  notifyStateChange<K extends ControllableFieldName>(
+    field: K,
+    value: ControllableFieldValue<K>,
+    prev: ControllableFieldValue<K>,
+    source: ControllableSource = 'user'
+  ): void {
+    const change: IrisGridStateChange<K> = {
+      field,
+      value,
+      prev,
+      source,
+      snapshot: () => this.state,
+    };
+    const { onStateDidChange } = this.props;
+    onStateDidChange?.(change as IrisGridStateChange);
+    this.stateChangeListeners.forEach(listener => {
+      try {
+        listener(change as IrisGridStateChange);
+      } catch (err) {
+        log.error('IrisGrid state change listener threw', err);
+      }
+    });
+  }
+
+  /**
+   * Phase 0: build (and cache) the control handle exposed through
+   * `IrisGridControlContext`. The handle is stable for the lifetime
+   * of the component instance so descendants can use it as an effect
+   * dependency without churn.
+   */
+  private getControlHandle(): IrisGridControlHandle {
+    if (this.cachedControlHandle != null) {
+      return this.cachedControlHandle;
+    }
+    const handle: IrisGridControlHandle = {
+      getState: () => this.state,
+      get: field => this.state[field],
+      apply: (field, value) => {
+        this.applyState(field, value, 'external');
+      },
+      subscribe: listener => {
+        this.stateChangeListeners.add(listener);
+        return () => {
+          this.stateChangeListeners.delete(listener);
+        };
+      },
+      subscribeField: (field, listener) => {
+        const wrapped: IrisGridStateChangeListener = change => {
+          if (change.field === field) {
+            // Cast: the field guard above narrows the value type.
+            listener(change as unknown as IrisGridStateChange<typeof field>);
+          }
+        };
+        this.stateChangeListeners.add(wrapped);
+        return () => {
+          this.stateChangeListeners.delete(wrapped);
+        };
+      },
+    };
+    this.cachedControlHandle = handle;
+    return handle;
   }
 
   handleOverflowClose(): void {
@@ -5154,270 +5326,276 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     });
 
     return (
-      <div className="iris-grid" role="presentation">
-        <div className="iris-grid-column">
-          {children != null && <div className="iris-grid-bar">{children}</div>}
-          <CSSTransition
-            in={isSelectingPartition}
-            timeout={ThemeExport.transitionSlowMs}
-            classNames="iris-grid-bar-horizontal"
-            onEnter={this.handleAnimationStart}
-            onEntered={this.handleAnimationEnd}
-            onExit={this.handleAnimationStart}
-            onExited={this.handleAnimationEnd}
-            mountOnEnter
-            unmountOnExit
-            nodeRef={this.slideTransitionRef}
-          >
-            <div
-              ref={this.slideTransitionRef}
-              className="iris-grid-partition-selector-wrapper iris-grid-bar iris-grid-bar-primary"
-            >
-              {isPartitionedGridModel(model) && model.isPartitionRequired && (
-                <IrisGridPartitionSelector
-                  model={model}
-                  partitionConfig={partitionConfig}
-                  onChange={this.handlePartitionChange}
-                />
-              )}
-            </div>
-          </CSSTransition>
-          <CSSTransition
-            in={showSearchBar}
-            timeout={ThemeExport.transitionSlowMs}
-            classNames="iris-grid-bar-horizontal"
-            onEnter={this.handleAnimationStart}
-            onEntered={this.handleAnimationEnd}
-            onExit={this.handleAnimationStart}
-            onExited={this.handleAnimationEnd}
-            mountOnEnter
-            unmountOnExit
-            nodeRef={this.bottomTransitionRef}
-          >
-            <div ref={this.bottomTransitionRef} className="iris-grid-bar">
-              <CrossColumnSearch
-                value={searchValue}
-                selectedColumns={selectedSearchColumns}
-                invertSelection={invertSearchColumns}
-                onChange={this.handleCrossColumnSearch}
-                columns={model.columns}
-                ref={this.crossColumnRef}
-              />
-            </div>
-          </CSSTransition>
-          <Grid
-            ref={grid => {
-              this.grid = grid;
-            }}
-            isStickyBottom={!isEditableGridModel(model) || !model.isEditable}
-            isStuckToBottom={isStuckToBottom}
-            isStuckToRight={isStuckToRight}
-            metricCalculator={metricCalculator}
-            model={model}
-            keyHandlers={this.getKeyHandlers()}
-            mouseHandlers={this.getMouseHandlers()}
-            movedColumns={movedColumns}
-            movedRows={movedRows}
-            onError={this.handleGridError}
-            onViewChanged={this.handleViewChanged}
-            onSelectionChanged={this.handleSelectionChanged}
-            onMovedColumnsChanged={this.handleMovedColumnsChanged}
-            renderer={this.renderer}
-            stateOverride={stateOverride}
-            theme={theme}
-          >
-            <IrisGridCellOverflowModal
-              isOpen={showOverflowModal}
-              text={overflowText}
-              onClose={this.handleOverflowClose}
-            />
-            {isVisible && (
-              <IrisGridModelUpdater
-                model={model}
-                top={top}
-                bottom={bottom}
-                left={left}
-                right={right}
-                filter={filter}
-                formatter={formatter}
-                columnAlignmentMap={columnAlignmentMap}
-                sorts={sorts}
-                reverse={reverse}
-                movedColumns={movedColumns}
-                customColumns={customColumns}
-                hiddenColumns={hiddenColumns}
-                alwaysFetchColumns={this.getAlwaysFetchColumns(
-                  alwaysFetchColumns,
-                  model.columns,
-                  movedColumns,
-                  model.floatingLeftColumnCount,
-                  model.floatingRightColumnCount,
-                  this.grid?.state.draggingColumn?.range
-                )}
-                formatColumns={this.getCachedPreviewFormatColumns(
-                  model.dh,
-                  model.columns,
-                  conditionalFormats,
-                  conditionalFormatPreview,
-                  // Disable the preview format when we press Back on the format edit page
-                  openOptions[openOptions.length - 1]?.type ===
-                    OptionType.CONDITIONAL_FORMATTING_EDIT
-                    ? conditionalFormatEditIndex ?? undefined
-                    : undefined
-                )}
-                rollupConfig={this.getModelRollupConfig(
-                  model.originalColumns,
-                  rollupConfig,
-                  aggregationSettings
-                )}
-                totalsConfig={this.getModelTotalsConfig(
-                  model.columns,
-                  rollupConfig,
-                  aggregationSettings
-                )}
-                selectDistinctColumns={selectDistinctColumns}
-                pendingRowCount={pendingRowCount}
-                pendingDataMap={pendingDataMap}
-                frozenColumns={frozenColumns}
-                columnHeaderGroups={columnHeaderGroups}
-                partitionConfig={partitionConfig}
-                showExtraGroupColumn={this.showExtraGroupColumn}
-              />
+      <IrisGridControlContext.Provider value={this.getControlHandle()}>
+        <div className="iris-grid" role="presentation">
+          <div className="iris-grid-column">
+            {children != null && (
+              <div className="iris-grid-bar">{children}</div>
             )}
-            {!isMenuShown && (
+            <CSSTransition
+              in={isSelectingPartition}
+              timeout={ThemeExport.transitionSlowMs}
+              classNames="iris-grid-bar-horizontal"
+              onEnter={this.handleAnimationStart}
+              onEntered={this.handleAnimationEnd}
+              onExit={this.handleAnimationStart}
+              onExited={this.handleAnimationEnd}
+              mountOnEnter
+              unmountOnExit
+              nodeRef={this.slideTransitionRef}
+            >
               <div
-                className="grid-settings-button"
-                style={{
-                  height: `${singleColumnHeaderHeight}px`,
-                  width: `${singleColumnHeaderHeight}px`,
-                }}
+                ref={this.slideTransitionRef}
+                className="iris-grid-partition-selector-wrapper iris-grid-bar iris-grid-bar-primary"
               >
-                <Button
-                  kind="ghost"
-                  data-testid={`btn-iris-grid-settings-button-${name}`}
-                  onClick={this.handleMenu}
-                  icon={<FontAwesomeIcon icon={vsMenu} transform="up-1" />}
-                  tooltip="Table Options"
+                {isPartitionedGridModel(model) && model.isPartitionRequired && (
+                  <IrisGridPartitionSelector
+                    model={model}
+                    partitionConfig={partitionConfig}
+                    onChange={this.handlePartitionChange}
+                  />
+                )}
+              </div>
+            </CSSTransition>
+            <CSSTransition
+              in={showSearchBar}
+              timeout={ThemeExport.transitionSlowMs}
+              classNames="iris-grid-bar-horizontal"
+              onEnter={this.handleAnimationStart}
+              onEntered={this.handleAnimationEnd}
+              onExit={this.handleAnimationStart}
+              onExited={this.handleAnimationEnd}
+              mountOnEnter
+              unmountOnExit
+              nodeRef={this.bottomTransitionRef}
+            >
+              <div ref={this.bottomTransitionRef} className="iris-grid-bar">
+                <CrossColumnSearch
+                  value={searchValue}
+                  selectedColumns={selectedSearchColumns}
+                  invertSelection={invertSearchColumns}
+                  onChange={this.handleCrossColumnSearch}
+                  columns={model.columns}
+                  ref={this.crossColumnRef}
                 />
               </div>
-            )}
-            {focusField}
-            {loadingElement}
-            {filterBar}
-            {columnTooltip}
-            {advancedFilterMenus}
-            {overflowButtonTooltipProps &&
-              this.getOverflowButtonTooltip(overflowButtonTooltipProps)}
-            {expandCellTooltipProps &&
-              this.getExpandCellTooltip(expandCellTooltipProps)}
-            {hoverTooltipProps && this.getHoverTooltip(hoverTooltipProps)}
-          </Grid>
-          <GotoRow
-            ref={this.gotoRowRef}
-            model={model}
-            isShown={isGotoShown}
-            gotoRow={gotoRow}
-            gotoRowError={gotoRowError}
-            gotoValueError={gotoValueError}
-            onGotoRowSubmit={this.handleGotoRowSelectedRowNumberSubmit}
-            onGotoRowNumberChanged={this.handleGotoRowSelectedRowNumberChanged}
-            onClose={this.handleGotoRowClosed}
-            onEntering={this.handleAnimationStart}
-            onEntered={this.handleAnimationEnd}
-            onExiting={() => {
-              this.handleAnimationStart();
-              this.focus();
-            }}
-            onExited={this.handleAnimationEnd}
-            gotoValueSelectedColumnName={gotoValueSelectedColumnName}
-            gotoValue={gotoValue}
-            gotoValueFilter={gotoValueSelectedFilter}
-            onGotoValueSelectedColumnNameChanged={
-              this.handleGotoValueSelectedColumnNameChanged
-            }
-            onGotoValueSelectedFilterChanged={
-              this.handleGotoValueSelectedFilterChanged
-            }
-            onGotoValueChanged={this.handleGotoValueChanged}
-            onGotoValueSubmit={this.handleGotoValueSubmitted}
-          />
+            </CSSTransition>
+            <Grid
+              ref={grid => {
+                this.grid = grid;
+              }}
+              isStickyBottom={!isEditableGridModel(model) || !model.isEditable}
+              isStuckToBottom={isStuckToBottom}
+              isStuckToRight={isStuckToRight}
+              metricCalculator={metricCalculator}
+              model={model}
+              keyHandlers={this.getKeyHandlers()}
+              mouseHandlers={this.getMouseHandlers()}
+              movedColumns={movedColumns}
+              movedRows={movedRows}
+              onError={this.handleGridError}
+              onViewChanged={this.handleViewChanged}
+              onSelectionChanged={this.handleSelectionChanged}
+              onMovedColumnsChanged={this.handleMovedColumnsChanged}
+              renderer={this.renderer}
+              stateOverride={stateOverride}
+              theme={theme}
+            >
+              <IrisGridCellOverflowModal
+                isOpen={showOverflowModal}
+                text={overflowText}
+                onClose={this.handleOverflowClose}
+              />
+              {isVisible && (
+                <IrisGridModelUpdater
+                  model={model}
+                  top={top}
+                  bottom={bottom}
+                  left={left}
+                  right={right}
+                  filter={filter}
+                  formatter={formatter}
+                  columnAlignmentMap={columnAlignmentMap}
+                  sorts={sorts}
+                  reverse={reverse}
+                  movedColumns={movedColumns}
+                  customColumns={customColumns}
+                  hiddenColumns={hiddenColumns}
+                  alwaysFetchColumns={this.getAlwaysFetchColumns(
+                    alwaysFetchColumns,
+                    model.columns,
+                    movedColumns,
+                    model.floatingLeftColumnCount,
+                    model.floatingRightColumnCount,
+                    this.grid?.state.draggingColumn?.range
+                  )}
+                  formatColumns={this.getCachedPreviewFormatColumns(
+                    model.dh,
+                    model.columns,
+                    conditionalFormats,
+                    conditionalFormatPreview,
+                    // Disable the preview format when we press Back on the format edit page
+                    openOptions[openOptions.length - 1]?.type ===
+                      OptionType.CONDITIONAL_FORMATTING_EDIT
+                      ? conditionalFormatEditIndex ?? undefined
+                      : undefined
+                  )}
+                  rollupConfig={this.getModelRollupConfig(
+                    model.originalColumns,
+                    rollupConfig,
+                    aggregationSettings
+                  )}
+                  totalsConfig={this.getModelTotalsConfig(
+                    model.columns,
+                    rollupConfig,
+                    aggregationSettings
+                  )}
+                  selectDistinctColumns={selectDistinctColumns}
+                  pendingRowCount={pendingRowCount}
+                  pendingDataMap={pendingDataMap}
+                  frozenColumns={frozenColumns}
+                  columnHeaderGroups={columnHeaderGroups}
+                  partitionConfig={partitionConfig}
+                  showExtraGroupColumn={this.showExtraGroupColumn}
+                />
+              )}
+              {!isMenuShown && (
+                <div
+                  className="grid-settings-button"
+                  style={{
+                    height: `${singleColumnHeaderHeight}px`,
+                    width: `${singleColumnHeaderHeight}px`,
+                  }}
+                >
+                  <Button
+                    kind="ghost"
+                    data-testid={`btn-iris-grid-settings-button-${name}`}
+                    onClick={this.handleMenu}
+                    icon={<FontAwesomeIcon icon={vsMenu} transform="up-1" />}
+                    tooltip="Table Options"
+                  />
+                </div>
+              )}
+              {focusField}
+              {loadingElement}
+              {filterBar}
+              {columnTooltip}
+              {advancedFilterMenus}
+              {overflowButtonTooltipProps &&
+                this.getOverflowButtonTooltip(overflowButtonTooltipProps)}
+              {expandCellTooltipProps &&
+                this.getExpandCellTooltip(expandCellTooltipProps)}
+              {hoverTooltipProps && this.getHoverTooltip(hoverTooltipProps)}
+            </Grid>
+            <GotoRow
+              ref={this.gotoRowRef}
+              model={model}
+              isShown={isGotoShown}
+              gotoRow={gotoRow}
+              gotoRowError={gotoRowError}
+              gotoValueError={gotoValueError}
+              onGotoRowSubmit={this.handleGotoRowSelectedRowNumberSubmit}
+              onGotoRowNumberChanged={
+                this.handleGotoRowSelectedRowNumberChanged
+              }
+              onClose={this.handleGotoRowClosed}
+              onEntering={this.handleAnimationStart}
+              onEntered={this.handleAnimationEnd}
+              onExiting={() => {
+                this.handleAnimationStart();
+                this.focus();
+              }}
+              onExited={this.handleAnimationEnd}
+              gotoValueSelectedColumnName={gotoValueSelectedColumnName}
+              gotoValue={gotoValue}
+              gotoValueFilter={gotoValueSelectedFilter}
+              onGotoValueSelectedColumnNameChanged={
+                this.handleGotoValueSelectedColumnNameChanged
+              }
+              onGotoValueSelectedFilterChanged={
+                this.handleGotoValueSelectedFilterChanged
+              }
+              onGotoValueChanged={this.handleGotoValueChanged}
+              onGotoValueSubmit={this.handleGotoValueSubmitted}
+            />
 
-          <PendingDataBottomBar
-            error={pendingSaveError}
-            isSaving={pendingSavePromise != null}
-            saveTooltip={`Commit (${this.commitAction.shortcut.getDisplayText()})`}
-            discardTooltip={`Discard (${this.discardAction.shortcut.getDisplayText()})`}
-            pendingDataErrors={pendingDataErrors}
-            pendingDataMap={pendingDataMap}
+            <PendingDataBottomBar
+              error={pendingSaveError}
+              isSaving={pendingSavePromise != null}
+              saveTooltip={`Commit (${this.commitAction.shortcut.getDisplayText()})`}
+              discardTooltip={`Discard (${this.discardAction.shortcut.getDisplayText()})`}
+              pendingDataErrors={pendingDataErrors}
+              pendingDataMap={pendingDataMap}
+              onEntering={this.handleAnimationStart}
+              onEntered={this.handleAnimationEnd}
+              onExiting={this.handleAnimationStart}
+              onExited={this.handleAnimationEnd}
+              onSave={this.handlePendingCommitClicked}
+              onDiscard={this.handlePendingDiscardClicked}
+            />
+            <ToastBottomBar>{toastMessage}</ToastBottomBar>
+            <IrisGridCopyHandler
+              model={model}
+              copyOperation={copyOperation ?? undefined}
+              onEntering={this.handleAnimationStart}
+              onEntered={this.handleAnimationEnd}
+              onExiting={this.handleAnimationStart}
+              onExited={this.handleAnimationEnd}
+            />
+            <TableSaver
+              dh={model.dh}
+              ref={tableSaver => {
+                this.tableSaver = tableSaver;
+              }}
+              getDownloadWorker={getDownloadWorker}
+              onDownloadCompleted={this.handleDownloadCompleted}
+              onDownloadCanceled={this.handleDownloadCanceled}
+              onDownloadProgressUpdate={this.handleDownloadProgressUpdate}
+              isDownloading={
+                tableDownloadStatus ===
+                TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING
+              }
+              formatter={formatter}
+            />
+          </div>
+          <SlideTransition
+            in={isMenuShown}
             onEntering={this.handleAnimationStart}
             onEntered={this.handleAnimationEnd}
             onExiting={this.handleAnimationStart}
             onExited={this.handleAnimationEnd}
-            onSave={this.handlePendingCommitClicked}
-            onDiscard={this.handlePendingDiscardClicked}
-          />
-          <ToastBottomBar>{toastMessage}</ToastBottomBar>
-          <IrisGridCopyHandler
-            model={model}
-            copyOperation={copyOperation ?? undefined}
-            onEntering={this.handleAnimationStart}
-            onEntered={this.handleAnimationEnd}
-            onExiting={this.handleAnimationStart}
-            onExited={this.handleAnimationEnd}
-          />
-          <TableSaver
-            dh={model.dh}
-            ref={tableSaver => {
-              this.tableSaver = tableSaver;
-            }}
-            getDownloadWorker={getDownloadWorker}
-            onDownloadCompleted={this.handleDownloadCompleted}
-            onDownloadCanceled={this.handleDownloadCanceled}
-            onDownloadProgressUpdate={this.handleDownloadProgressUpdate}
-            isDownloading={
-              tableDownloadStatus ===
-              TableCsvExporter.DOWNLOAD_STATUS.DOWNLOADING
-            }
-            formatter={formatter}
+            mountOnEnter
+            unmountOnExit
+          >
+            <div className="table-sidebar">
+              <Stack>
+                <Page title="Table Options" onClose={this.handleMenuClose}>
+                  <Menu
+                    onSelect={i => this.handleMenuSelect(optionItems[i])}
+                    items={optionItems}
+                  />
+                </Page>
+                {openOptionsStack.map((option, i) => (
+                  <Page
+                    title={openOptions[i].title}
+                    onBack={this.handleMenuBack}
+                    onClose={this.handleMenuClose}
+                    key={openOptions[i].type}
+                  >
+                    {option}
+                  </Page>
+                ))}
+              </Stack>
+            </div>
+          </SlideTransition>
+          <ContextActions actions={this.contextActions} />
+          <NoPastePermissionModal
+            isOpen={showNoPastePermissionModal}
+            onClose={this.handleCloseNoPastePermissionModal}
+            errorMessage={noPastePermissionError}
           />
         </div>
-        <SlideTransition
-          in={isMenuShown}
-          onEntering={this.handleAnimationStart}
-          onEntered={this.handleAnimationEnd}
-          onExiting={this.handleAnimationStart}
-          onExited={this.handleAnimationEnd}
-          mountOnEnter
-          unmountOnExit
-        >
-          <div className="table-sidebar">
-            <Stack>
-              <Page title="Table Options" onClose={this.handleMenuClose}>
-                <Menu
-                  onSelect={i => this.handleMenuSelect(optionItems[i])}
-                  items={optionItems}
-                />
-              </Page>
-              {openOptionsStack.map((option, i) => (
-                <Page
-                  title={openOptions[i].title}
-                  onBack={this.handleMenuBack}
-                  onClose={this.handleMenuClose}
-                  key={openOptions[i].type}
-                >
-                  {option}
-                </Page>
-              ))}
-            </Stack>
-          </div>
-        </SlideTransition>
-        <ContextActions actions={this.contextActions} />
-        <NoPastePermissionModal
-          isOpen={showNoPastePermissionModal}
-          onClose={this.handleCloseNoPastePermissionModal}
-          errorMessage={noPastePermissionError}
-        />
-      </div>
+      </IrisGridControlContext.Provider>
     );
   }
 }

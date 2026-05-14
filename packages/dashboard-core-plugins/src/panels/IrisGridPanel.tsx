@@ -148,6 +148,17 @@ export interface OwnProps extends DashboardPanelProps {
   panelState?: LoadedPanelState | null;
   makeModel: () => IrisGridModel | Promise<IrisGridModel>;
 
+  /**
+   * Phase 0 (DH-21476) controllable hook. Receives the base model
+   * resolved from `makeModel` and returns a (possibly wrapping)
+   * model to drive the panel. Used by plugins that need a custom
+   * model implementation (e.g. simple-pivot's
+   * `IrisGridSimplePivotModel`) without live-swapping the model
+   * inside `IrisGrid` state. Sync return only — if you need to
+   * fetch additional data, do it inside `makeModel` first.
+   */
+  modelFactory?: (baseModel: IrisGridModel) => IrisGridModel;
+
   onStateChange?: (irisGridState: IrisGridState, gridState: GridState) => void;
   onPanelStateUpdate?: (panelState: PanelState) => void;
 
@@ -534,12 +545,23 @@ export class IrisGridPanel extends PureComponent<
       error: null,
       isDisconnected: false,
     });
-    const { makeModel } = this.props;
+    const { makeModel, modelFactory } = this.props;
     if (this.modelPromise != null) {
       this.modelPromise.cancel();
     }
-    this.modelPromise = PromiseUtils.makeCancelable(makeModel(), resolved =>
-      resolved.close()
+    const baseModelPromise = Promise.resolve(makeModel()).then(baseModel => {
+      try {
+        return modelFactory != null ? modelFactory(baseModel) : baseModel;
+      } catch (err) {
+        // If the factory throws, surface as a load failure so the
+        // promise rejection path runs and the base model is closed.
+        baseModel.close();
+        throw err;
+      }
+    });
+    this.modelPromise = PromiseUtils.makeCancelable(
+      baseModelPromise,
+      resolved => resolved.close()
     );
     this.modelPromise.then(this.handleLoadSuccess).catch(this.handleLoadError);
   }
