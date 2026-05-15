@@ -3,7 +3,10 @@ import type {
   ColumnName,
   InputFilter,
   IrisGridContextMenuData,
+  IrisGridModel,
   IrisGridTableModelTemplate,
+  OptionItem,
+  SidebarPageComponent,
 } from '@deephaven/iris-grid';
 import { type GridRange } from '@deephaven/grid';
 import type { ResolvableContextAction } from '@deephaven/components';
@@ -11,6 +14,28 @@ import type { dh } from '@deephaven/jsapi-types';
 
 export interface TablePluginElement {
   getMenu?: (data: IrisGridContextMenuData) => ResolvableContextAction[];
+
+  /**
+   * Transform the sidebar menu items shown in the IrisGrid options menu.
+   * Receives the default items and should return the modified list.
+   */
+  menuItems?: (items: OptionItem[]) => OptionItem[];
+
+  /**
+   * Map of custom sidebar page type keys to React components.
+   * Each component receives `{ model: IrisGridModel }`.
+   */
+  sidebarPages?: Record<string, SidebarPageComponent>;
+
+  /**
+   * Factory function to create a custom IrisGridModel.
+   * When provided, overrides the default model creation.
+   */
+  modelFactory?: (
+    dh: typeof import('@deephaven/jsapi-types').dh,
+    table: dh.Table,
+    tableName: string
+  ) => Promise<IrisGridModel>;
 }
 
 export interface TablePluginProps<S = unknown> {

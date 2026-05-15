@@ -9,6 +9,8 @@ import {
   isIrisGridTableModelTemplate,
   type IrisGridType,
   type IrisGridContextMenuData,
+  type OptionItem,
+  type SidebarPageComponent,
 } from '@deephaven/iris-grid';
 import { type GridRange } from '@deephaven/grid';
 import { TablePluginWrapper } from './TablePluginWrapper';
@@ -50,6 +52,9 @@ export function useTablePlugin({
   selectedRanges,
 }: UseTablePluginProps): {
   Plugin: JSX.Element | null;
+  menuItems: ((items: OptionItem[]) => OptionItem[]) | undefined;
+  sidebarPages: Record<string, SidebarPageComponent> | undefined;
+  modelFactory: TablePluginElement['modelFactory'] | undefined;
 } & Pick<
   IrisGridProps,
   'customFilters' | 'alwaysFetchColumns' | 'onContextMenu'
@@ -107,6 +112,9 @@ export function useTablePlugin({
     customFilters,
     alwaysFetchColumns,
     onContextMenu,
+    menuItems: pluginRef.current?.menuItems,
+    sidebarPages: pluginRef.current?.sidebarPages,
+    modelFactory: pluginRef.current?.modelFactory,
   };
 }
 

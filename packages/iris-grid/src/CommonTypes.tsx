@@ -43,12 +43,20 @@ export type Action = {
 };
 
 export type OptionItem = {
-  type: OptionType;
+  /**
+   * The option type identifier. Built-in types use the `OptionType` enum;
+   * plugins may use any unique string.
+   */
+  type: OptionType | string;
   title: string;
   subtitle?: string;
   icon?: IconDefinition;
   isOn?: boolean;
   onChange?: () => void;
+  /** When true the item is visually dimmed and clicking is a no-op. */
+  disabled?: boolean;
+  /** Tooltip text shown on hover when the item is disabled. */
+  tooltip?: string;
 };
 
 export interface UITotalsTableConfig extends dh.TotalsTableConfig {

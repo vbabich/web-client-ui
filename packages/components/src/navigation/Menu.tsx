@@ -23,7 +23,9 @@ export function Menu({
             <MenuItem
               item={item}
               onSelect={() => {
-                onSelect(itemIndex);
+                if (!item.disabled) {
+                  onSelect(itemIndex);
+                }
               }}
             />
           </li>

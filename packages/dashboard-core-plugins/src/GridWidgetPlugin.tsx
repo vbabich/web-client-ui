@@ -128,6 +128,8 @@ export function GridWidgetPlugin({
     customFilters,
     alwaysFetchColumns: filterFetchColumns,
     onContextMenu,
+    menuItems,
+    sidebarPages,
   } = useTablePlugin({
     model,
     irisGridRef,
@@ -171,6 +173,8 @@ export function GridWidgetPlugin({
       onContextMenu={onContextMenu}
       inputFilters={inputFilters}
       customFilters={customFilters}
+      menuItems={menuItems}
+      sidebarPages={sidebarPages}
       // eslint-disable-next-line react/jsx-props-no-spreading
       {...linkerProps}
       alwaysFetchColumns={alwaysFetchColumns}
