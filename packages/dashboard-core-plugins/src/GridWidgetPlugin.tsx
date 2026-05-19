@@ -6,6 +6,7 @@ import {
   type DehydratedIrisGridState,
   IrisGrid,
   IrisGridCacheUtils,
+  type IrisGridModel,
   type IrisGridState,
   type IrisGridType,
   IrisGridUtils,
@@ -28,15 +29,36 @@ import { InputFilterEvent } from './events';
 import useGridLinker from './useGridLinker';
 import { useTablePlugin } from './useTablePlugin';
 
+/**
+ * Phase 0 (DH-21476) extension of `WidgetComponentProps` with a
+ * controllable hook for plugins that need to wrap the base model
+ * (e.g. simple-pivot's `IrisGridSimplePivotModel`). The default
+ * widget-plugin registration path does not pass `modelFactory`;
+ * consumers that need it must render `GridWidgetPlugin` directly.
+ */
+export interface GridWidgetPluginProps
+  extends WidgetComponentProps<DhType.Table> {
+  /** See `IrisGridPanel.modelFactory` for the contract. */
+  modelFactory?: (baseModel: IrisGridModel) => IrisGridModel;
+}
+
 export function GridWidgetPlugin({
   fetch,
-}: WidgetComponentProps<DhType.Table>): JSX.Element | null {
+  modelFactory,
+}: GridWidgetPluginProps): JSX.Element | null {
   const settings = useSelector(getSettings<RootState>);
   const { eventHub } = useLayoutManager();
 
   const fetchResult = useIrisGridModel(fetch);
-  const model =
+  const baseModel =
     fetchResult.status === 'success' ? fetchResult.model : undefined;
+  const model = useMemo(
+    () =>
+      baseModel != null && modelFactory != null
+        ? modelFactory(baseModel)
+        : baseModel,
+    [baseModel, modelFactory]
+  );
 
   const dh = useApi();
   const irisGridUtils = useMemo(() => new IrisGridUtils(dh), [dh]);
@@ -51,21 +73,16 @@ export function GridWidgetPlugin({
   const hydratedState = useMemo(() => {
     if (
       fetchResult.status !== 'success' ||
+      model == null ||
       initialState.current === undefined
     ) {
       return;
     }
     return {
-      ...irisGridUtils.hydrateIrisGridState(
-        fetchResult.model,
-        initialState.current
-      ),
-      ...IrisGridUtils.hydrateGridState(
-        fetchResult.model,
-        initialState.current
-      ),
+      ...irisGridUtils.hydrateIrisGridState(model, initialState.current),
+      ...IrisGridUtils.hydrateGridState(model, initialState.current),
     };
-  }, [fetchResult, irisGridUtils]);
+  }, [fetchResult.status, model, irisGridUtils]);
 
   const dehydrateIrisGridState = useMemo(
     () => IrisGridCacheUtils.makeMemoizedCombinedGridStateDehydrator(),
@@ -76,21 +93,18 @@ export function GridWidgetPlugin({
     (irisGridState: IrisGridState, gridState: GridState) => {
       if (
         fetchResult.status !== 'success' ||
+        model == null ||
         irisGridState == null ||
         gridState == null
       ) {
         return;
       }
 
-      const newState = dehydrateIrisGridState(
-        fetchResult.model,
-        irisGridState,
-        gridState
-      );
+      const newState = dehydrateIrisGridState(model, irisGridState, gridState);
 
       setState(newState);
     },
-    [fetchResult, setState, dehydrateIrisGridState]
+    [fetchResult.status, model, setState, dehydrateIrisGridState]
   );
 
   const inputFilters = useDashboardColumnFilters(
@@ -103,10 +117,7 @@ export function GridWidgetPlugin({
   const irisGridRef = useRef<IrisGridType | null>(null);
 
   const { alwaysFetchColumns: linkerAlwaysFetchColumns, ...linkerProps } =
-    useGridLinker(
-      fetchResult.status === 'success' ? fetchResult.model : null,
-      irisGridRef.current
-    );
+    useGridLinker(model ?? null, irisGridRef.current);
 
   const handleClearAllFilters = useCallback(() => {
     if (irisGridRef.current == null) {

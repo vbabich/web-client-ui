@@ -32,3 +32,4 @@ export * from './IrisGridMetricCalculator';
 export * from './IrisGridRenderer';
 export * from './IrisGridCacheUtils';
 export { default as IrisGridCellRendererUtils } from './IrisGridCellRendererUtils';
+export * from './controllable';
