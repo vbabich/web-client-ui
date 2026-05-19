@@ -1761,7 +1761,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       }
     });
     if (isChanged) {
-      this.setState({
+      this.applyStateMany({
         quickFilters: newQuickFilters,
         advancedFilters: newAdvancedFilters,
       });
@@ -1956,7 +1956,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     this.clearGridInputField();
 
     this.startLoading('Clearing Filters...', { resetRanges: true });
-    this.setState({
+    this.applyStateMany({
       quickFilters: new Map(),
       advancedFilters: new Map(),
       searchValue: '',
@@ -1973,7 +1973,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   clearCrossColumSearch(): void {
     log.debug('Clearing cross-column search');
 
-    this.setState({
+    this.applyStateMany({
       searchValue: '',
       searchFilter: undefined,
     });
@@ -2028,7 +2028,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     });
     this.startLoading('Rebuilding filters...', { resetRanges: true });
 
-    this.setState({
+    this.applyStateMany({
       quickFilters: newQuickFilters,
       advancedFilters: newAdvancedFilters,
     });
@@ -2038,7 +2038,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     quickFilters,
     advancedFilters,
   }: Pick<IrisGridState, 'quickFilters' | 'advancedFilters'>): void {
-    this.setState({
+    this.applyStateMany({
       quickFilters,
       advancedFilters,
     });
@@ -2233,6 +2233,9 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       this.applyInputFilters(inputFiltersWithValues);
     }
 
+    // Initial snapshot from the model on mount — intentionally bypasses the
+    // applyState pipe so consumers do not receive a flood of onStateDidChange
+    // events for fields they did not explicitly drive.
     this.setState({
       sorts,
       reverse: reverse || reverseType === TableUtils.REVERSE_TYPE.POST_SORT,
@@ -2294,7 +2297,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
             mode: model.isPartitionAwareSourceTable ? 'partition' : 'keys',
           };
           keyTable.close();
-          this.setState({
+          this.applyStateMany({
             loadingSpinnerShown: false,
             partitionConfig: newPartition,
           });
@@ -2327,7 +2330,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         partitions: values,
         mode: 'partition',
       };
-      this.setState({
+      this.applyStateMany({
         isSelectingPartition: true,
         partitionConfig: newPartition,
       });
@@ -2482,7 +2485,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       } = this.lastLoadedConfig;
 
       this.lastLoadedConfig = null;
-      this.setState({
+      this.applyStateMany({
         advancedFilters,
         aggregationSettings,
         customColumns,
@@ -2495,7 +2498,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       });
     } else {
       log.debug('remove all sorts, filters, and custom columns');
-      this.setState({
+      this.applyStateMany({
         advancedFilters: new Map(),
         aggregationSettings: DEFAULT_AGGREGATION_SETTINGS,
         customColumns: [],
@@ -2633,7 +2636,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       movedColumns
     );
 
-    this.setState({
+    this.applyStateMany({
       frozenColumns: [...allFrozenColumns],
       movedColumns: newMovedColumns,
     });
@@ -2662,7 +2665,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       movedColumns
     );
 
-    this.setState({
+    this.applyStateMany({
       frozenColumns: [...allFrozenColumns],
       movedColumns: newMovedColumns,
     });
@@ -2749,9 +2752,10 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     metricCalculator.resetAllColumnWidths();
     this.handleMovedColumnsChanged(model.initialMovedColumns);
     this.handleHeaderGroupsChanged(model.initialColumnHeaderGroups);
-    this.setState({
-      frozenColumns: model.layoutHints?.frozenColumns ?? EMPTY_ARRAY,
-    });
+    this.applyState(
+      'frozenColumns',
+      model.layoutHints?.frozenColumns ?? EMPTY_ARRAY
+    );
   }
 
   handleCrossColumnSearch(
@@ -2769,7 +2773,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       invertSearchColumns
     );
 
-    this.setState({
+    this.applyStateMany({
       searchValue,
       selectedSearchColumns,
       invertSearchColumns,
@@ -3683,7 +3687,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         newAdvancedFilters.size !== advancedFilters.size
       ) {
         log.debug(`removing filters from removed custom columns...`);
-        this.setState({
+        this.applyStateMany({
           quickFilters: newQuickFilters,
           advancedFilters: newAdvancedFilters,
         });
@@ -3909,7 +3913,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     // Have to clear select distinct since rollup uses the original columns, not the current ones.
     // IrisGridProxyModel has a check to prevent model update
     // when selectDistinctModel is cleared and the rollupConfig is set on the model.
-    this.setState({
+    this.applyStateMany({
       rollupConfig,
       movedColumns: EMPTY_ARRAY,
       frozenColumns: EMPTY_ARRAY,
@@ -3934,7 +3938,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       }...`
     );
 
-    this.setState({
+    this.applyStateMany({
       selectDistinctColumns: columnNames,
       movedColumns: [],
       sorts: [],
@@ -4264,9 +4268,9 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    * change with `'external'`.
    *
    * Multi-field setStates inside one transaction are intentionally
-   * NOT supported here \u2014 they should remain as targeted
-   * `this.setState` calls. The canonical pipe is per-field on
-   * purpose so the granular event stream stays one-change-per-event.
+   * NOT supported here - use `applyStateMany` for those. The
+   * canonical single-field pipe stays per-field on purpose so the
+   * granular event stream stays one-change-per-event.
    */
   applyState<K extends ControllableFieldName>(
     field: K,
@@ -4286,6 +4290,45 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     const partial = { [field]: value } as unknown as Pick<IrisGridState, K>;
     this.setState(partial, () => {
       this.notifyStateChange(field, value, prev, source);
+      callback?.();
+    });
+  }
+
+  /**
+   * Phase 0: multi-field counterpart to `applyState`. Performs a single
+   * `setState` transaction (one re-render) and emits one
+   * `onStateDidChange` event per registered field whose value changed.
+   * Unregistered fields in `partial` are passed through to `setState`
+   * verbatim with no event emission, which lets call sites that mix
+   * registered fields with transient/scratch state (e.g. `gotoRow`,
+   * loading flags) keep their original batching.
+   *
+   * Skips emission for fields whose `value === prev` to keep the event
+   * stream noise-free; pass-through `setState` semantics are preserved.
+   */
+  applyStateMany(
+    partial: Partial<IrisGridState>,
+    source: ControllableSource = 'internal',
+    callback?: () => void
+  ): void {
+    const prev = this.state;
+    this.setState(partial as Pick<IrisGridState, keyof IrisGridState>, () => {
+      (Object.keys(partial) as (keyof IrisGridState)[]).forEach(key => {
+        if (CONTROLLABLE_FIELDS[key as ControllableFieldName] == null) {
+          return;
+        }
+        const next = this.state[key];
+        const before = prev[key];
+        if (next === before) {
+          return;
+        }
+        this.notifyStateChange(
+          key as ControllableFieldName,
+          next as ControllableFieldValue<ControllableFieldName>,
+          before as ControllableFieldValue<ControllableFieldName>,
+          source
+        );
+      });
       callback?.();
     });
   }

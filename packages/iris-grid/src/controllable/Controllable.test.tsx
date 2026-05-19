@@ -232,6 +232,197 @@ describe('IrisGrid.applyState pipe', () => {
 
     expect(spy).toHaveBeenCalledWith('sorts', nextSorts);
   });
+
+  /**
+   * Handler-gesture tests for the Phase 0.1 migration. Each test invokes
+   * the public handler exactly once and asserts the migrated registered
+   * field flows through `onStateDidChange` with `source: 'internal'`.
+   *
+   * For handlers that cascade into the model updater (e.g. `sortColumn`,
+   * `reverse`, `handlePartitionChange`) the mock `dh` lacks the matching
+   * Table method, so we fall back to spying on `applyState` and asserting
+   * the migration boundary was hit with the right `(field, value)`.
+   */
+
+  it('handleFrozenColumnsChanged fires onStateDidChange', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+    const next: readonly string[] = ['Col1'];
+
+    act(() => {
+      grid.handleFrozenColumnsChanged(next);
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('frozenColumns');
+    expect(change.value).toBe(next);
+    expect(change.source).toBe('internal');
+  });
+
+  it('setAdvancedFilterMap fires onStateDidChange', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+    const next = new Map();
+
+    act(() => {
+      grid.setAdvancedFilterMap(next);
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('advancedFilters');
+    expect(change.value).toBe(next);
+    expect(change.source).toBe('internal');
+  });
+
+  it('handleConditionalFormatsChange fires onStateDidChange', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+    const next: never[] = [];
+
+    act(() => {
+      grid.handleConditionalFormatsChange(next);
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('conditionalFormats');
+    expect(change.value).toBe(next);
+    expect(change.source).toBe('internal');
+  });
+
+  it('handleMovedColumnsChanged routes through applyState with callback', () => {
+    // IrisGrid lifecycle (componentDidUpdate) re-emits movedColumns when
+    // it changes, so the real onStateDidChange fires more than once.
+    // Spy on the migration boundary instead.
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation((_field, _value, _source, cb) => cb?.());
+    const next: never[] = [];
+    const callback = jest.fn();
+
+    act(() => {
+      grid.handleMovedColumnsChanged(next, callback);
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      'movedColumns',
+      next,
+      'internal',
+      callback
+    );
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearAllAggregations fires onStateDidChange for aggregationSettings', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+
+    act(() => {
+      grid.clearAllAggregations();
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('aggregationSettings');
+    expect(change.source).toBe('internal');
+  });
+
+  it('handleGotoRowOpened notifies isGotoShown via the escape-hatch', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+
+    act(() => {
+      grid.handleGotoRowOpened();
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('isGotoShown');
+    expect(change.value).toBe(true);
+    expect(change.prev).toBe(false);
+    expect(change.source).toBe('internal');
+  });
+
+  it('handleGotoRowClosed notifies isGotoShown via the escape-hatch', () => {
+    const onStateDidChange = jest.fn();
+    const { grid } = makeGrid({ onStateDidChange });
+    // Open first so prev=true, value=false is meaningful.
+    act(() => {
+      grid.handleGotoRowOpened();
+    });
+    onStateDidChange.mockClear();
+
+    act(() => {
+      grid.handleGotoRowClosed();
+    });
+
+    expect(onStateDidChange).toHaveBeenCalledTimes(1);
+    const change = onStateDidChange.mock.calls[0][0] as IrisGridStateChange;
+    expect(change.field).toBe('isGotoShown');
+    expect(change.value).toBe(false);
+    expect(change.prev).toBe(true);
+    expect(change.source).toBe('internal');
+  });
+
+  // Spy-fallback tests: handlers whose downstream effects (model updater,
+  // grid ref access) would crash on the test mock.
+
+  it('handleAggregationsChange routes through applyState', () => {
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+    const next = { aggregations: [], showOnTop: false };
+
+    act(() => {
+      grid.handleAggregationsChange(next);
+    });
+
+    expect(spy).toHaveBeenCalledWith('aggregationSettings', next);
+  });
+
+  it('handlePartitionChange routes through applyState', () => {
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+    const next = { mode: 'partition', partitions: [] } as never;
+
+    act(() => {
+      grid.handlePartitionChange(next);
+    });
+
+    expect(spy).toHaveBeenCalledWith('partitionConfig', next);
+  });
+
+  it('sortColumn routes through applyState', () => {
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+
+    act(() => {
+      grid.sortColumn(0);
+    });
+
+    expect(spy).toHaveBeenCalledWith('sorts', expect.any(Array));
+  });
+
+  it('toggleFilterBar routes through applyState', () => {
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+
+    act(() => {
+      grid.toggleFilterBar();
+    });
+
+    expect(spy).toHaveBeenCalledWith('isFilterBarShown', expect.any(Boolean));
+  });
 });
 
 describe('IrisGridControlContext', () => {
