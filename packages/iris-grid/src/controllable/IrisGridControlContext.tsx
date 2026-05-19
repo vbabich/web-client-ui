@@ -21,6 +21,15 @@ import type {
 } from './ControllableFields';
 
 /**
+ * Patch shape accepted by the batch overload of
+ * `IrisGridControlHandle.apply`. Restricted to registered fields so
+ * unregistered keys cannot sneak past the type system.
+ */
+export type IrisGridStatePatch = {
+  readonly [K in ControllableFieldName]?: ControllableFieldValue<K>;
+};
+
+/**
  * Public read/write/subscribe surface for the controllable fields of a
  * single `IrisGrid` instance.
  */
@@ -50,6 +59,15 @@ export interface IrisGridControlHandle {
     field: K,
     value: ControllableFieldValue<K>
   ): void;
+
+  /**
+   * Batch overload: apply many registered fields in a single
+   * `setState` transaction. Emits one `onStateDidChange` event per
+   * field whose value actually changed, tagged `source: 'external'`.
+   * Unregistered keys are ignored (the field-restricted patch type
+   * prevents them at compile time).
+   */
+  apply(patch: IrisGridStatePatch): void;
 
   /**
    * Subscribe to granular `IrisGridStateChange` events. Returns an

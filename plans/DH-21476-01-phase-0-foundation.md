@@ -1,10 +1,12 @@
 # Plan: Make IrisGrid State Externally Controllable
 
-> **Status**: Phase 0 plumbing implemented on branch `vlad-DH-21476-phase-0-take-1`
-> and merged into the integration branch `vlad-DH-21476-o4.7`; not yet on `main`.
-> Phase 0.1 (handler migration) not started.
+> **Status**: Phase 0 plumbing **and** Phase 0.1 handler migration both
+> implemented on the integration branch `vlad-DH-21476-o4.7`; not yet on
+> `main`. Every registered field now writes through `applyState` /
+> `applyStateMany`; conformance suite is 54 tests, full iris-grid suite
+> is 424/424, full app suite is 3440/3440.
 > **Owner**: TBD.
-> **Working branch**: ship Phase 0 directly to `main` as a series of
+> **Working branch**: ship Phase 0 + 0.1 to `main` as a series of
 > non-breaking PRs.
 > **Unblocks**: [Imperative ref handle](./DH-21476-02-imperative-ref-handle.md),
 > [Create Pivot plugin](./DH-21476-03-create-pivot-plugin.md),
@@ -112,12 +114,19 @@ Done field-by-field rather than as one mega-PR. Each PR:
 
 ### Phase 0.1 — Definition of Done
 
+All three items satisfied on `vlad-DH-21476-o4.7`:
+
 - Every registered field has zero direct `this.setState({ <field>: ... })`
-  call sites in `IrisGrid.tsx`; all writes go through `applyState`.
+  call sites in `IrisGrid.tsx`; all writes go through `applyState`
+  (single-field) or `applyStateMany` (multi-field transactions).
 - The parametric conformance test from Phase 0 is extended to drive
   each field via its primary user gesture (synthetic event or method
-  call) and assert the event fires exactly once with `source: 'internal'`.
-- No behavior changes intended; full unit + snapshot suites pass.
+  call) and assert the event fires exactly once with `source: 'internal'`,
+  plus a parametric `it.each` over `CONTROLLABLE_FIELD_LIST` that drives
+  every registered field externally through `handle.apply(field, value)`
+  and asserts one event tagged `source: 'external'`.
+- No behavior changes intended; full unit + snapshot suites pass
+  (iris-grid 424/424, full app 3440/3440).
 
 ### Phase 0.1 — Verification commands
 
@@ -129,6 +138,51 @@ npm run test:unit -- --testPathPattern="packages/iris-grid"
 # Full app tests
 npm run test
 ```
+
+---
+
+## Implementation notes (Phase 0 + 0.1, as shipped)
+
+Patterns that emerged during the migration and are now part of the
+contract for downstream phases:
+
+- **`applyStateMany(partial, source, callback, skipEmit)`** is the
+  multi-field counterpart to `applyState`. It performs a single
+  `setState` transaction (one re-render) and emits one
+  `onStateDidChange` event per registered field whose value changed.
+  Use it for handlers that need to mutate several registered fields
+  atomically (e.g. `handleRollupChange` clearing sorts/moves/etc.).
+  Unregistered fields in `partial` pass through to `setState` verbatim
+  with no event emission, which lets call sites mix registered fields
+  with transient/scratch state without leaking events.
+- **`skipEmit` parameter** (5th on `applyState`, 4th on
+  `applyStateMany`) suppresses the per-field `onStateDidChange` fan-out
+  for a single write. Passed `true` by initial-snapshot paths driven
+  by props/model (currently only `initFormatter` →
+  `updateFormatterSettings` → `updateFormatter`) so consumers don't
+  receive synthetic events for state they never explicitly drove.
+  `componentDidUpdate`'s legitimate settings-prop emit path keeps the
+  default `false`.
+- **Mount-time `loadTableState`** intentionally bypasses the pipe with
+  raw `setState` (commented inline). Same rationale as `skipEmit`:
+  the model snapshot on mount is not a user write.
+- **`notifyStateChange` is the escape hatch** for handlers that must
+  drive a multi-field `setState` whose batching cannot be expressed
+  through `applyStateMany` (e.g. `handleAggregationEdit` pairing
+  registered `openOptions` with the unregistered scratch field
+  `selectedAggregation`). Callers `setState` directly and then invoke
+  `notifyStateChange(field, value, prev)` from the `setState`
+  callback. Pre-check `value === prev` if you want noop suppression.
+- **Sample-value table** in `Controllable.test.tsx`
+  (`SAMPLE_VALUES`) is the canonical reference for what a non-default
+  value looks like for each registered field. Update it when adding
+  new fields to the registry. The parametric test skips `formatter`
+  (opaque, plugins drive `customColumnFormatMap` /
+  `columnAlignmentMap`), `reverse` (cascades to
+  `model.dh.Table.reverse` not on the mock), `movedColumns`
+  (re-emits via `componentDidUpdate`), and `openOptions` (renders
+  the sidebar). Each is covered by a dedicated spy-based or
+  side-effect test elsewhere in the suite.
 
 ---
 

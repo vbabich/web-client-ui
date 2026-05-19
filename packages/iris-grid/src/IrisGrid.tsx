@@ -104,6 +104,7 @@ import {
   type ControllableFieldValue,
   type ControllableSource,
   type IrisGridControlHandle,
+  type IrisGridStatePatch,
   type IrisGridStateChange,
   type IrisGridStateChangeListener,
 } from './controllable';
@@ -519,7 +520,10 @@ export interface IrisGridState {
   columnHeaderGroups: readonly ColumnHeaderGroup[];
 }
 
-class IrisGrid extends Component<IrisGridProps, IrisGridState> {
+class IrisGrid
+  extends Component<IrisGridProps, IrisGridState>
+  implements IrisGridControlHandle
+{
   static contextType = IrisGridThemeContext;
 
   // eslint-disable-next-line react/static-property-placement, react/sort-comp
@@ -1085,22 +1089,6 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    * `applyState` pipe in addition to the legacy `onStateChange` prop.
    */
   private stateChangeListeners: Set<IrisGridStateChangeListener> = new Set();
-
-  /**
-   * True while running an initial-snapshot path (mount-time formatter
-   * setup, etc.) that writes through `applyState` / `applyStateMany`
-   * but should not flood `onStateDidChange` listeners with synthetic
-   * events for state the consumer never explicitly drove. Captured at
-   * call time so async `setState` callbacks honor the value that was
-   * in effect when the write was scheduled.
-   */
-  private isInitSnapshot = false;
-
-  /**
-   * Lazily-built control handle exposed via `IrisGridControlContext`.
-   * Memoized so descendants can use referential equality.
-   */
-  private cachedControlHandle: IrisGridControlHandle | null = null;
 
   lastFocusedFilterBarColumn?: number;
 
@@ -2043,7 +2031,11 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     });
   }
 
-  updateFormatterSettings(settings?: Settings, forceUpdate = true): void {
+  updateFormatterSettings(
+    settings?: Settings,
+    forceUpdate = true,
+    skipEmit = false
+  ): void {
     const globalColumnFormats = FormatterUtils.getColumnFormats(settings);
     const dateTimeFormatterOptions =
       FormatterUtils.getDateTimeFormatterOptions(settings);
@@ -2101,7 +2093,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       this.showEmptyStrings = showEmptyStrings;
       this.showNullStrings = showNullStrings;
       this.showExtraGroupColumn = showExtraGroupColumn;
-      this.updateFormatter({}, forceUpdate);
+      this.updateFormatter({}, forceUpdate, skipEmit);
 
       if (isDateFormattingChanged && forceUpdate) {
         this.rebuildFilters();
@@ -2150,7 +2142,8 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   updateFormatter(
     updatedFormats: { customColumnFormatMap?: Map<ColumnName, FormattingRule> },
-    forceUpdate = true
+    forceUpdate = true,
+    skipEmit = false
   ): void {
     const { customColumnFormatMap } = this.state;
     const { model } = this.props;
@@ -2175,11 +2168,16 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     log.debug('updateFormatter', this.globalColumnFormats, mergedColumnFormats);
 
-    this.applyStateMany({ ...update, formatter }, 'internal', () => {
-      if (forceUpdate && this.grid) {
-        this.grid.forceUpdate();
-      }
-    });
+    this.applyStateMany(
+      { ...update, formatter },
+      'internal',
+      () => {
+        if (forceUpdate && this.grid) {
+          this.grid.forceUpdate();
+        }
+      },
+      skipEmit
+    );
   }
 
   initFormatter(): void {
@@ -2190,12 +2188,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     // explicitly drove. Subsequent settings-prop changes go through
     // componentDidUpdate -> updateFormatterSettings -> updateFormatter
     // and DO emit normally.
-    this.isInitSnapshot = true;
-    try {
-      this.updateFormatterSettings(settings);
-    } finally {
-      this.isInitSnapshot = false;
-    }
+    this.updateFormatterSettings(settings, true, true);
   }
 
   initState(): void {
@@ -4282,12 +4275,19 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    * NOT supported here - use `applyStateMany` for those. The
    * canonical single-field pipe stays per-field on purpose so the
    * granular event stream stays one-change-per-event.
+   *
+   * `skipEmit` suppresses the `onStateDidChange` fan-out for the
+   * current write. Callers should pass `true` only for initial
+   * snapshots driven by the model/props (e.g. mount-time formatter
+   * setup) where firing per-field events would flood consumers with
+   * synthetic changes they never explicitly drove.
    */
   applyState<K extends ControllableFieldName>(
     field: K,
     value: ControllableFieldValue<K>,
     source: ControllableSource = 'internal',
-    callback?: () => void
+    callback?: () => void,
+    skipEmit = false
   ): void {
     if (CONTROLLABLE_FIELDS[field] == null) {
       log.warn(
@@ -4296,7 +4296,6 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       );
     }
     const prev = this.state[field];
-    const skipEmit = this.isInitSnapshot;
     // Cast required because TS can't narrow Pick<State, K> from a
     // dynamic key without an explicit assertion.
     const partial = { [field]: value } as unknown as Pick<IrisGridState, K>;
@@ -4319,14 +4318,17 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    *
    * Skips emission for fields whose `value === prev` to keep the event
    * stream noise-free; pass-through `setState` semantics are preserved.
+   *
+   * `skipEmit` suppresses the per-field `onStateDidChange` fan-out for
+   * the whole batch. See `applyState` for when to pass `true`.
    */
   applyStateMany(
     partial: Partial<IrisGridState>,
     source: ControllableSource = 'internal',
-    callback?: () => void
+    callback?: () => void,
+    skipEmit = false
   ): void {
     const prev = this.state;
-    const skipEmit = this.isInitSnapshot;
     this.setState(partial as Pick<IrisGridState, keyof IrisGridState>, () => {
       if (!skipEmit) {
         (Object.keys(partial) as (keyof IrisGridState)[]).forEach(key => {
@@ -4385,42 +4387,64 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   }
 
   /**
-   * Phase 0: build (and cache) the control handle exposed through
-   * `IrisGridControlContext`. The handle is stable for the lifetime
-   * of the component instance so descendants can use it as an effect
-   * dependency without churn.
+   * Phase 0: `IrisGridControlHandle` implementation. The class itself
+   * satisfies the handle interface so consumers can take a typed ref
+   * directly (`useRef<IrisGridControlHandle>(null)`) without an
+   * intervening forwardRef wrapper. The same `this` is also the
+   * value published through `IrisGridControlContext`.
    */
-  private getControlHandle(): IrisGridControlHandle {
-    if (this.cachedControlHandle != null) {
-      return this.cachedControlHandle;
+  getState(): Readonly<IrisGridState> {
+    const { state } = this;
+    return state;
+  }
+
+  get<K extends ControllableFieldName>(field: K): ControllableFieldValue<K> {
+    const { state } = this;
+    return state[field];
+  }
+
+  apply<K extends ControllableFieldName>(
+    field: K,
+    value: ControllableFieldValue<K>
+  ): void;
+
+  apply(patch: IrisGridStatePatch): void;
+
+  apply<K extends ControllableFieldName>(
+    fieldOrPatch: K | IrisGridStatePatch,
+    value?: ControllableFieldValue<K>
+  ): void {
+    if (typeof fieldOrPatch === 'string') {
+      this.applyState(
+        fieldOrPatch,
+        value as ControllableFieldValue<K>,
+        'external'
+      );
+    } else {
+      this.applyStateMany(fieldOrPatch as Partial<IrisGridState>, 'external');
     }
-    const handle: IrisGridControlHandle = {
-      getState: () => this.state,
-      get: field => this.state[field],
-      apply: (field, value) => {
-        this.applyState(field, value, 'external');
-      },
-      subscribe: listener => {
-        this.stateChangeListeners.add(listener);
-        return () => {
-          this.stateChangeListeners.delete(listener);
-        };
-      },
-      subscribeField: (field, listener) => {
-        const wrapped: IrisGridStateChangeListener = change => {
-          if (change.field === field) {
-            // Cast: the field guard above narrows the value type.
-            listener(change as unknown as IrisGridStateChange<typeof field>);
-          }
-        };
-        this.stateChangeListeners.add(wrapped);
-        return () => {
-          this.stateChangeListeners.delete(wrapped);
-        };
-      },
+  }
+
+  subscribe(listener: IrisGridStateChangeListener): () => void {
+    this.stateChangeListeners.add(listener);
+    return () => {
+      this.stateChangeListeners.delete(listener);
     };
-    this.cachedControlHandle = handle;
-    return handle;
+  }
+
+  subscribeField<K extends ControllableFieldName>(
+    field: K,
+    listener: (change: IrisGridStateChange<K>) => void
+  ): () => void {
+    const wrapped: IrisGridStateChangeListener = change => {
+      if (change.field === field) {
+        listener(change as unknown as IrisGridStateChange<K>);
+      }
+    };
+    this.stateChangeListeners.add(wrapped);
+    return () => {
+      this.stateChangeListeners.delete(wrapped);
+    };
   }
 
   handleOverflowClose(): void {
@@ -5398,7 +5422,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     });
 
     return (
-      <IrisGridControlContext.Provider value={this.getControlHandle()}>
+      <IrisGridControlContext.Provider value={this}>
         <div className="iris-grid" role="presentation">
           <div className="iris-grid-column">
             {children != null && (

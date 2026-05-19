@@ -66,13 +66,10 @@ function makeGrid(
   }
   render(<GridWithRef />);
   const grid = ref!.current!;
-  // The control handle delivered through IrisGridControlContext is the
-  // same object returned by `getControlHandle()`. Call it directly so
-  // the test does not depend on having a ContextConsumer descendant.
-  const getHandle = (): IrisGridControlHandle =>
-    (
-      grid as unknown as { getControlHandle: () => IrisGridControlHandle }
-    ).getControlHandle();
+  // IrisGrid now `implements IrisGridControlHandle` directly, so the
+  // class instance IS the handle published through
+  // IrisGridControlContext. No closure / no wrapper needed.
+  const getHandle = (): IrisGridControlHandle => grid;
   return { grid, model, getHandle };
 }
 
