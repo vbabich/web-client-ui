@@ -1,5 +1,12 @@
 # Plan: Process & Sequencing for Controllable IrisGrid Branches
 
+> **Status note (branch `vlad-DH-21476-o4.7`)**: A/B/C spike evaluation is
+> **paused**. The active deliverable on this branch is
+> [DH-21476-05 — sidebar plugin extensibility](./DH-21476-05-sidebar-plugin-extensibility.md),
+> which lands on top of Phase 0 without picking a controllability winner.
+> Re-open this process plan once we have real plugin consumers and a
+> concrete reason to choose between A, B, and C.
+>
 > Companion to [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md)
 > and the three branch plans:
 > [Branch A — imperative ref](./DH-21476-02-spike-branch-a-imperative-ref.md),

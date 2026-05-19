@@ -1,6 +1,12 @@
 # Plan: Plugin Replacement of the Table Options Sidebar
 
 > **Status**: blocked on the chosen controllability branch landing on `main`.
+> **Narrow subset shipping now**: the add/hide-item subset of this plan
+> is delivered on branch `vlad-DH-21476-o4.7` via
+> [DH-21476-05 — sidebar plugin extensibility](./DH-21476-05-sidebar-plugin-extensibility.md).
+> This plan remains the long-term target for full sidebar-host
+> extraction (parent-owned host + `sidebarPages` slot + complete
+> page replacement).
 > **Owner**: TBD (the plugin lives in `deephaven-plugins/plugins/table-options/`).
 > **Working branch**: `feat/table-options-plugin` in `deephaven-plugins`; framework changes go through PRs in `web-client-ui`.
 > **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) **and** the winning controllability branch ([A](./DH-21476-02-spike-branch-a-imperative-ref.md), [B](./DH-21476-02-spike-branch-b-expanded-override.md), or [C](./DH-21476-03-spike-branch-c-idiomatic-react-rewrite.md)).

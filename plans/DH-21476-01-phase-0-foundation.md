@@ -36,7 +36,7 @@ Phase 0 is intentionally **plumbing only**: registry + canonical mutator + granu
 2. **Introduce a canonical mutator.** Today there is a mix of `handleXChange`, `setX`, and direct `setState` orchestrators. Add a single generic `applyState<K extends ControllableFieldName>(field, value, source)` method on `IrisGrid` where `source ∈ 'user' | 'external'`. Internal handlers will call `applyState(field, value, 'user')`; the external `IrisGridControlHandle.apply` calls `applyState(field, value, 'external')`. This avoids the recursion hazards all three branches will hit (override → setState → onStateChange → override loop). Phase 0 only **adds** `applyState` and routes the sidebar-nav fields through it; the full migration of existing handlers is Phase 0.1.
 3. **Make `onStateChange` granular and structured.** Currently emits the full `IrisGridState` after any change. Add (additively, keep old callback) `onStateDidChange(change: IrisGridStateChange)` where `change` is `{ field, value, prev, source }` plus a `snapshot` getter. Critical so external code can distinguish its own writes from internal user changes without diffing the entire `IrisGridState`.
 4. **Stable serializable representations.** For every controllable field, define a serializable shape suitable for crossing the plugin boundary (Python/JS bridge). Lean on existing `dehydrate*` helpers in [IrisGridUtils.ts](../packages/iris-grid/src/IrisGridUtils.ts). Some fields (`formatter`, `model`) are not serializable as-is — they need either a "by-reference" handle or a dedicated codec. Document each in the registry.
-5. **Decide: where does the model live?** Recommendation: keep [IrisGridProxyModel.ts](../packages/iris-grid/src/IrisGridProxyModel.ts) and [IrisGridModelUpdater.tsx](../packages/iris-grid/src/IrisGridModelUpdater.tsx) unchanged. Plugins do **not** swap the model directly; they drive `rollupConfig` / `selectDistinctColumns` / `customColumns` etc. and the proxy reacts. For the rare case a plugin needs a custom model (e.g. `simple-pivot`'s `IrisGridSimplePivotModel`), expose a `modelFactory?: (baseModel) => IrisGridModel` prop on both [IrisGridPanel](../packages/dashboard-core-plugins/src/panels/IrisGridPanel.tsx) and [GridWidgetPlugin](../packages/dashboard-core-plugins/src/GridWidgetPlugin.tsx) rather than letting plugins live-swap. Document this boundary explicitly.
+5. **Decide: where does the model live?** Recommendation: keep [IrisGridProxyModel.ts](../packages/iris-grid/src/IrisGridProxyModel.ts) and [IrisGridModelUpdater.tsx](../packages/iris-grid/src/IrisGridModelUpdater.tsx) unchanged. Plugins do **not** swap the model directly; they drive `rollupConfig` / `selectDistinctColumns` / `customColumns` etc. and the proxy reacts. 
 6. **Plugin-facing context.** Introduce `IrisGridControlContext` (React context) inside `iris-grid` exposing an `IrisGridControlHandle` with `{ getState, get, apply, subscribe, subscribeField }`. Both branches expose their public API through this context so consumers (children rendered via the existing `children` prop, plus `TablePluginProps`) get the same shape. The context value is `null` outside an `IrisGrid` subtree.
 7. **Make sidebar navigation controllable (no extraction yet).** The full extraction of the Table Options sidebar host into a parent-supplied component **cannot happen in Phase 0** — the built-in pages ([RollupRows](../packages/iris-grid/src/sidebar/RollupRows.tsx), [AggregationsBuilder](../packages/iris-grid/src/sidebar/aggregations), etc.) call `this.handleX` / `this.setState` directly on the `IrisGrid` class today. Until Branch A or B ships a public write surface for those pages to bind to, ripping them out of `IrisGrid` would just trade class-internal coupling for a sprawl of callback props piped across the new boundary — reinventing the very API the framework is supposed to define.
 
@@ -67,11 +67,8 @@ Phase 0 (plumbing) is complete when:
   `packages/iris-grid/src/controllable/Controllable.test.tsx` that
   iterates the registry rather than enumerating fields by hand.
 - `IrisGridControlContext` is exported and a Provider wraps `<IrisGrid>`'s
-  render subtree so both built-in descendants and the `children` slot
-  see the same handle. (See "Open framework questions" #2 for the
-  `children` vs `toolbar` decision.)
-- `modelFactory?: (baseModel) => IrisGridModel` accepted on both
-  `IrisGridPanel` and `GridWidgetPlugin`.
+  entire render subtree (built-in descendants and the `children` slot
+  both see the same handle).
 - Sidebar-nav mutations (`isMenuShown`, `openOptions`) route through
   `applyState`; both fields are in the registry. Built-in sidebar pages
   still inline; no extraction.
@@ -87,6 +84,8 @@ npm run types
 npm run test:unit -- --testPathPattern="packages/iris-grid/src/controllable"
 # Full iris-grid unit suite (regression guard)
 npm run test:unit -- --testPathPattern="packages/iris-grid"
+# Full app tests
+npm run test
 ```
 
 ---
@@ -128,8 +127,8 @@ Done field-by-field rather than as one mega-PR. Each PR:
 npm run test:unit -- --testPathPattern="packages/iris-grid/src/controllable"
 # Full iris-grid unit suite
 npm run test:unit -- --testPathPattern="packages/iris-grid"
-# Guard against regressions in dashboard panels that consume the grid
-npm run test:unit -- --testPathPattern="packages/dashboard-core-plugins"
+# Full app tests
+npm run test
 ```
 
 ---
@@ -190,9 +189,9 @@ Branch-specific files are listed in the per-branch plans:
 - **Model swaps**: not directly plugin-controllable. Plugins drive state (`rollupConfig`, `selectDistinctColumns`, etc.) and `IrisGridProxyModel` reacts. Custom model classes (à la `simple-pivot`) plug in via the `modelFactory` prop on `IrisGridPanel`/`GridWidgetPlugin`, not via live swap.
 - **Persistence**: lean on existing `dehydrate/hydrate` codecs in `IrisGridUtils`. The registry references them; we don't reinvent serialization.
 - **Loop protection**: every `apply` carries a `source: 'user' | 'external'` tag. The change event echoes it. Branches B and C use it to suppress redundant override / dispatch loops.
+- **`children` slot stays.** `<IrisGrid>{children}</IrisGrid>` continues to render a toolbar slot; we do **not** introduce a separate `toolbar` prop. `IrisGridControlContext` is the canonical state-access path for anything rendered into `children` (and for built-in descendants). Provider scope is the full `<IrisGrid>` render subtree.
 
 ## Open framework questions
 
 1. **Python-side reach.** Branch A needs a JSON-RPC layer to drive the grid from Python; Branches B and C serialize naturally. Confirm with the deephaven-plugins team whether driving the grid from Python is a v1 requirement *before* the spike decision in the [process plan](./DH-21476-00-process-and-decision.md).
-2. **`children` slot.** Today `<IrisGrid>{children}</IrisGrid>` renders a toolbar. Either keep `children` and document `IrisGridControlContext` as the canonical state-access path for child plugins, or deprecate in favor of an explicit `toolbar` prop. Recommendation: keep `children`, document the context.
-3. **Granular `onStateChange` migration risk.** Replacing the monolithic `onStateChange(state, gridState)` with a granular event is a behavior change for any consumer that diffs the snapshot. Recommendation: ship granular as `onStateDidChange` (new name), keep the old callback for one major. Don't combine them.
+2. **Granular `onStateChange` migration risk.** Replacing the monolithic `onStateChange(state, gridState)` with a granular event is a behavior change for any consumer that diffs the snapshot. Recommendation: ship granular as `onStateDidChange` (new name), keep the old callback for one major. Don't combine them.
