@@ -2,13 +2,13 @@
 
 > **Status**: ready to start in parallel with the spike branches — this
 > plugin is the **shared spike consumer** referenced by the
-> [process plan, Step 2](./DH-21476-controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed).
+> [process plan, Step 2](./DH-21476-00-process-and-decision.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed).
 > **Owner**: TBD (plugin lives in `deephaven-plugins/plugins/create-pivot/`).
 > **Working branch**: `feat/create-pivot-plugin` in `deephaven-plugins`;
 > framework slice (sidebar slot + optional `useSessionVariablesByType`)
 > ships from a separate PR in `web-client-ui`.
-> **Depends on**: a small slice of [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) (sidebar slot extension + `IrisGridControlContext` exposing `model`); coordination with the PivotService team for the type string and `createPivot` signature.
-> **Blocks / unblocks**: the spike memos for [Branch A](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md) and [Branch B](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md) consume this plugin as their evaluation harness; build it as **branch-agnostic** so the same plugin code runs against both spikes with one import swap.
+> **Depends on**: a small slice of [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) (sidebar slot extension + `IrisGridControlContext` exposing `model`); coordination with the PivotService team for the type string and `createPivot` signature.
+> **Blocks / unblocks**: the spike memos for [Branch A](./DH-21476-02-spike-branch-a-imperative-ref.md) and [Branch B](./DH-21476-02-spike-branch-b-expanded-override.md) consume this plugin as their evaluation harness; build it as **branch-agnostic** so the same plugin code runs against both spikes with one import swap.
 > **Definition of Done**: "Create Pivot" entry appears in Table Options on flat tables, enabled when a `PivotService` is reachable; submit calls `pivotService.createPivot(...)` and opens the resulting widget; full Jest + one Playwright suite green; documented in the plugin's README.
 > **Quick commands**:
 >
@@ -54,9 +54,9 @@
 
 ## Required framework support
 
-This plugin is much smaller than the sidebar-replacement consumer in the companion plan. It needs only a subset of Phase 0 from [DH-21476-controllable-iris-grid-state.md](./DH-21476-controllable-iris-grid-state.md):
+This plugin is much smaller than the sidebar-replacement consumer in the companion plan. It needs only a subset of Phase 0 from [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md):
 
-1. **Sidebar-slot extension point** (the `sidebarPages` + `menuItems` props described in [DH-21476-controllable-iris-grid-table-options-plugin.md § Required additions](./DH-21476-controllable-iris-grid-table-options-plugin.md)). Without `menuItems` the plugin can't append an entry; without `sidebarPages` it can't render its own page when that entry is selected. **Mandatory.**
+1. **Sidebar-slot extension point** (the `sidebarPages` + `menuItems` props described in [DH-21476-04-post-decision-table-options-plugin.md § Required additions](./DH-21476-04-post-decision-table-options-plugin.md)). Without `menuItems` the plugin can't append an entry; without `sidebarPages` it can't render its own page when that entry is selected. **Mandatory.**
 2. **Read-only access to the source `IrisGridModel`** via `IrisGridControlContext` (Phase 0 #6). The plugin needs the column list, table schema, and a handle to the underlying `dh.Table`. The framework already exposes the model on `TablePluginProps.model` — this just needs to keep working.
 3. **Sibling-variable discovery — already supported in OSS.** Both editions expose `dh.IdeConnection.subscribeToFieldUpdates(callback)`, which delivers `dh.ide.VariableChanges` (`{ created, updated, removed }` arrays). The plugin filters by `definition.type === 'PivotService'`. Access path:
    - The TablePlugin's React subtree can call `useConnection()` from `@deephaven/app-utils` (the same hook the console uses) to obtain the `IdeConnection` shared with the source table. No new field on `TablePluginProps` is strictly required for v1.
@@ -97,8 +97,8 @@ Six small PRs, all but the first in `deephaven-plugins`. Total scope is small en
 
 ### Milestone 0 — Framework prerequisites (web-client-ui, 1 PR)
 
-- Land just the slice of [DH-21476-controllable-iris-grid-state.md](./DH-21476-controllable-iris-grid-state.md) Phase 0 needed here:
-  - Sidebar-slot extension (`sidebarPages`, `menuItems`) — see [DH-21476-controllable-iris-grid-table-options-plugin.md § Required additions](./DH-21476-controllable-iris-grid-table-options-plugin.md). The `OptionItem` type ([sidebar/](../packages/iris-grid/src/sidebar/index.ts)) needs to gain an optional `disabled?: boolean` and `tooltip?: ReactNode` so the plugin can render the disabled-with-tooltip state described above. Confirm whether the existing `Menu`/`Page` primitives already render a disabled state — if not, extend them.
+- Land just the slice of [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md) Phase 0 needed here:
+  - Sidebar-slot extension (`sidebarPages`, `menuItems`) — see [DH-21476-04-post-decision-table-options-plugin.md § Required additions](./DH-21476-04-post-decision-table-options-plugin.md). The `OptionItem` type ([sidebar/](../packages/iris-grid/src/sidebar/index.ts)) needs to gain an optional `disabled?: boolean` and `tooltip?: ReactNode` so the plugin can render the disabled-with-tooltip state described above. Confirm whether the existing `Menu`/`Page` primitives already render a disabled state — if not, extend them.
   - **Optional but recommended**: add a `useSessionVariablesByType(type, opts?)` hook to [packages/jsapi-utils](../packages/jsapi-utils) wrapping `connection.subscribeToFieldUpdates`. Edition-agnostic; DHE narrowing via the optional `querySerial` arg. Skip if it adds friction — the plugin can call `subscribeToFieldUpdates` directly.
 - No `applyX` normalization needed yet — this plugin doesn't write.
 - Tests: Jest test that a custom `menuItems` adds an entry and a custom `sidebarPages` page renders when selected; Jest test that a disabled `OptionItem` renders with its tooltip and does not open a page on click; if the helper hook lands, a small Jest test for it against a mocked `IdeConnection`.

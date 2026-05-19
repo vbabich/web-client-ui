@@ -3,11 +3,11 @@
 > **Status**: spike-ready (waiting on Phase 0 to land on `main`).
 > **Owner**: TBD.
 > **Working branch**: `spike/controllable-iris-grid-branch-a` off `main`.
-> **Depends on**: [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
-> **Spike scope**: see [process plan, Step 2](./DH-21476-controllable-iris-grid-state-process.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
-> 3-4 representative fields + the [Create Pivot plugin](./DH-21476-controllable-iris-grid-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**.
+> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
+> **Spike scope**: see [process plan, Step 2](./DH-21476-00-process-and-decision.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
+> 3-4 representative fields + the [Create Pivot plugin](./DH-21476-02-spike-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**.
 > **Definition of Done (spike)**: 4 fields driven through `IrisGridHandle`; Create Pivot plugin builds against the spike; one-page evaluation memo committed to the spike branch (LOC, render counts, plugin DX, snapshot churn — see process plan).
-> **Companion branches**: [Branch B](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md), [Branch C](./DH-21476-controllable-iris-grid-state-branch-c-idiomatic-react-rewrite.md).
+> **Companion branches**: [Branch B](./DH-21476-02-spike-branch-b-expanded-override.md), [Branch C](./DH-21476-03-spike-branch-c-idiomatic-react-rewrite.md).
 > **Quick commands**:
 >
 > ```bash
@@ -45,10 +45,10 @@ bridges them for React consumers.
 
 ## Prerequisites
 
-All seven items of [Phase 0 in the framework plan](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this).
+All seven items of [Phase 0 in the framework plan](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this).
 This branch will not start until Phase 0 lands and is green in CI. The
 sidebar host extraction (Phase 0 #7) is **not** a prerequisite — it is a
-consumer of this branch (see the [Table Options sidebar plugin plan](./DH-21476-controllable-iris-grid-table-options-plugin.md))
+consumer of this branch (see the [Table Options sidebar plugin plan](./DH-21476-04-post-decision-table-options-plugin.md))
 and `openSidebar(option)` / `closeSidebar()` / `setOpenOptions(stack)`
 on the handle are derived automatically from the registered fields.
 

@@ -3,8 +3,8 @@
 > **Status**: feasibility-spike-ready (waiting on Phase 0 to land on `main`).
 > **Owner**: TBD.
 > **Working branch**: `spike/controllable-iris-grid-branch-c` off `main`.
-> **Depends on**: [Phase 0](./DH-21476-controllable-iris-grid-state.md#phase-0--shared-foundation-both-branches-build-on-this) (registry only — the rest is replaced by this branch's store).
-> **Spike scope (per [process plan, Step 3](./DH-21476-controllable-iris-grid-state-process.md#step-3--branch-c-feasibility-spike-parallel-separate-shape))**:
+> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) (registry only — the rest is replaced by this branch's store).
+> **Spike scope (per [process plan, Step 3](./DH-21476-00-process-and-decision.md#step-3--branch-c-feasibility-spike-parallel-separate-shape))**:
 > 2-3 day **architecture-only** spike. Stand up `createIrisGridStore` for
 > the same 3-4 fields chosen by Branches A/B. Port **one slice** (sorts)
 > behind `IRIS_GRID_V2`. **No plugin work, no migration, no compat shim.**
@@ -12,7 +12,7 @@
 > Branch C is picked at the decision meeting.
 > **Definition of Done (spike)**: `createIrisGridStore` + `IrisGridStoreProvider` + `useIrisGridSelector` exist; sorts slice renders behind `IRIS_GRID_V2`; one-page feasibility memo answers the four questions in the process plan's Step 3.
 > **Definition of Done (production, post-decision)**: every `IrisGridState` field reachable through `selectors.ts`; `IrisGridLegacy` removed; conformance suite green; `deephaven-plugins/{ui,simple-pivot}` build green against the new package.
-> **Companion branches**: [Branch A](./DH-21476-controllable-iris-grid-state-branch-a-imperative-ref.md), [Branch B](./DH-21476-controllable-iris-grid-state-branch-b-expanded-override.md).
+> **Companion branches**: [Branch A](./DH-21476-02-spike-branch-a-imperative-ref.md), [Branch B](./DH-21476-02-spike-branch-b-expanded-override.md).
 > **Quick commands**:
 >
 > ```bash
@@ -36,7 +36,7 @@ and [FilterSetManagerPanel](../packages/dashboard-core-plugins/src/panels/Filter
 working, but **direct ref consumers of the `IrisGrid` class instance
 break** (e.g. `irisGrid.handleRollupChange(...)`). Sidebar replacement
 falls out of the rewrite for free — pages use the same store hooks as
-plugins, so the [sidebar plugin plan](./DH-21476-controllable-iris-grid-table-options-plugin.md)
+plugins, so the [sidebar plugin plan](./DH-21476-04-post-decision-table-options-plugin.md)
 collapses to "register your `SidebarPage` in the host app's `pages`
 prop".
 
@@ -222,7 +222,7 @@ green against the same test suite.
 
 Branch A and Branch B both treat sidebar replacement as a follow-up that
 sits on top of the controllability framework (see
-[DH-21476-controllable-iris-grid-table-options-plugin.md](./DH-21476-controllable-iris-grid-table-options-plugin.md)).
+[DH-21476-04-post-decision-table-options-plugin.md](./DH-21476-04-post-decision-table-options-plugin.md)).
 This branch folds it into the rewrite because the rewrite is what makes
 it cheap.
 
@@ -260,7 +260,7 @@ Design:
   `popSidebarPage`, `closeSidebar` like any other action.
 
 This makes the sidebar plugin plan
-([DH-21476-controllable-iris-grid-table-options-plugin.md](./DH-21476-controllable-iris-grid-table-options-plugin.md))
+([DH-21476-04-post-decision-table-options-plugin.md](./DH-21476-04-post-decision-table-options-plugin.md))
 collapse to: "register your `SidebarPage` in the host app's `pages`
 prop". No separate extraction phase needed.
 
