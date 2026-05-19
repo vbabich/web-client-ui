@@ -1087,6 +1087,16 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   private stateChangeListeners: Set<IrisGridStateChangeListener> = new Set();
 
   /**
+   * True while running an initial-snapshot path (mount-time formatter
+   * setup, etc.) that writes through `applyState` / `applyStateMany`
+   * but should not flood `onStateDidChange` listeners with synthetic
+   * events for state the consumer never explicitly drove. Captured at
+   * call time so async `setState` callbacks honor the value that was
+   * in effect when the write was scheduled.
+   */
+  private isInitSnapshot = false;
+
+  /**
    * Lazily-built control handle exposed via `IrisGridControlContext`.
    * Memoized so descendants can use referential equality.
    */
@@ -1816,18 +1826,17 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     this.startLoading('Filtering...', { resetRanges: true });
 
-    this.setState(({ advancedFilters }) => {
-      const newAdvancedFilters = new Map(advancedFilters);
-      if (filter == null) {
-        newAdvancedFilters.delete(modelIndex);
-      } else {
-        newAdvancedFilters.set(modelIndex, {
-          filter,
-          options,
-        });
-      }
-      return { advancedFilters: newAdvancedFilters };
-    });
+    const { advancedFilters } = this.state;
+    const newAdvancedFilters = new Map(advancedFilters);
+    if (filter == null) {
+      newAdvancedFilters.delete(modelIndex);
+    } else {
+      newAdvancedFilters.set(modelIndex, {
+        filter,
+        options,
+      });
+    }
+    this.applyState('advancedFilters', newAdvancedFilters);
   }
 
   /**
@@ -1845,11 +1854,10 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     this.startLoading('Filtering...', { resetRanges: true });
 
-    this.setState(({ quickFilters }) => {
-      const newQuickFilters = new Map(quickFilters);
-      newQuickFilters.set(modelIndex, { filter, text });
-      return { quickFilters: newQuickFilters };
-    });
+    const { quickFilters } = this.state;
+    const newQuickFilters = new Map(quickFilters);
+    newQuickFilters.set(modelIndex, { filter, text });
+    this.applyState('quickFilters', newQuickFilters);
   }
 
   /**
@@ -1902,42 +1910,33 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       ? modelRange
       : [modelRange, modelRange];
 
-    this.setState(
-      ({ advancedFilters, quickFilters }: Partial<IrisGridState>) => {
-        const newAdvancedFilters: AdvancedFilterMap = advancedFilters
-          ? new Map(advancedFilters)
-          : new Map();
-        const newQuickFilters: QuickFilterMap = quickFilters
-          ? new Map(quickFilters)
-          : new Map();
-        newAdvancedFilters.forEach((_, column) => {
-          if (column >= clearRange[0] && column <= clearRange[1]) {
-            newAdvancedFilters.delete(column);
-          }
-        });
-        newQuickFilters.forEach((_, column) => {
-          if (column >= clearRange[0] && column <= clearRange[1]) {
-            newQuickFilters.delete(column);
-          }
-        });
-
-        return {
-          quickFilters: newQuickFilters,
-          advancedFilters: newAdvancedFilters,
-        };
+    const { advancedFilters, quickFilters } = this.state;
+    const newAdvancedFilters: AdvancedFilterMap = new Map(advancedFilters);
+    const newQuickFilters: QuickFilterMap = new Map(quickFilters);
+    newAdvancedFilters.forEach((_, column) => {
+      if (column >= clearRange[0] && column <= clearRange[1]) {
+        newAdvancedFilters.delete(column);
       }
-    );
+    });
+    newQuickFilters.forEach((_, column) => {
+      if (column >= clearRange[0] && column <= clearRange[1]) {
+        newQuickFilters.delete(column);
+      }
+    });
+
+    this.applyStateMany({
+      quickFilters: newQuickFilters,
+      advancedFilters: newAdvancedFilters,
+    });
   }
 
   removeQuickFilter(modelColumn: ModelIndex): void {
     this.startLoading('Clearing Filter...', { resetRanges: true });
 
-    this.setState(({ quickFilters }) => {
-      const newQuickFilters = new Map(quickFilters);
-      newQuickFilters.delete(modelColumn);
-
-      return { quickFilters: newQuickFilters };
-    });
+    const { quickFilters } = this.state;
+    const newQuickFilters = new Map(quickFilters);
+    newQuickFilters.delete(modelColumn);
+    this.applyState('quickFilters', newQuickFilters);
   }
 
   clearAllFilters(): void {
@@ -2176,7 +2175,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
     log.debug('updateFormatter', this.globalColumnFormats, mergedColumnFormats);
 
-    this.setState({ ...update, formatter }, () => {
+    this.applyStateMany({ ...update, formatter }, 'internal', () => {
       if (forceUpdate && this.grid) {
         this.grid.forceUpdate();
       }
@@ -2185,7 +2184,18 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   initFormatter(): void {
     const { settings } = this.props;
-    this.updateFormatterSettings(settings);
+    // Initial snapshot from props on mount - suppress per-field
+    // emits so consumers don't receive synthetic onStateDidChange
+    // events for `formatter` / `customColumnFormatMap` they never
+    // explicitly drove. Subsequent settings-prop changes go through
+    // componentDidUpdate -> updateFormatterSettings -> updateFormatter
+    // and DO emit normally.
+    this.isInitSnapshot = true;
+    try {
+      this.updateFormatterSettings(settings);
+    } finally {
+      this.isInitSnapshot = false;
+    }
   }
 
   initState(): void {
@@ -2602,7 +2612,10 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     }
 
     this.lastFocusedFilterBarColumn = column;
-    this.setState({ focusedFilterBarColumn: column, isFilterBarShown: true });
+    this.applyStateMany({
+      focusedFilterBarColumn: column,
+      isFilterBarShown: true,
+    });
   }
 
   hideColumnByVisibleIndex(columnVisibleIndex: VisibleIndex): void {
@@ -3005,18 +3018,13 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     }
 
     const update = !showSearchBar;
-    this.setState(
-      {
-        showSearchBar: update,
-      },
-      () => {
-        if (update && this.crossColumnRef?.current) {
-          this.crossColumnRef?.current.focus();
-        } else {
-          this.grid?.focus();
-        }
+    this.applyState('showSearchBar', update, 'internal', () => {
+      if (update && this.crossColumnRef?.current) {
+        this.crossColumnRef?.current.focus();
+      } else {
+        this.grid?.focus();
       }
-    );
+    });
   }
 
   toggleGotoRow(row = '', value = '', columnName = ''): void {
@@ -3288,15 +3296,14 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   handleFilterBarChange(value: string): void {
     this.startLoading('Filtering...', { resetRanges: true });
 
-    this.setState(({ focusedFilterBarColumn, quickFilters }) => {
-      const newQuickFilters = new Map(quickFilters);
-      if (focusedFilterBarColumn != null) {
-        const modelIndex = this.getModelColumn(focusedFilterBarColumn);
-        assertNotNull(modelIndex);
-        this.applyQuickFilter(modelIndex, value, newQuickFilters);
-      }
-      return { quickFilters: newQuickFilters };
-    });
+    const { focusedFilterBarColumn, quickFilters } = this.state;
+    const newQuickFilters = new Map(quickFilters);
+    if (focusedFilterBarColumn != null) {
+      const modelIndex = this.getModelColumn(focusedFilterBarColumn);
+      assertNotNull(modelIndex);
+      this.applyQuickFilter(modelIndex, value, newQuickFilters);
+    }
+    this.applyState('quickFilters', newQuickFilters);
   }
 
   handleFilterBarDone(setGridFocus = true, defocusInput = true): void {
@@ -3351,15 +3358,14 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     const { model } = this.props;
     const column = model.columns[modelIndex];
 
-    this.setState(({ columnAlignmentMap = EMPTY_MAP }) => {
-      const newColumnAlignmentMap = new Map(columnAlignmentMap);
-      if (alignment != null) {
-        newColumnAlignmentMap.set(column.name, alignment);
-      } else {
-        newColumnAlignmentMap.delete(column.name);
-      }
-      return { columnAlignmentMap: newColumnAlignmentMap };
-    });
+    const { columnAlignmentMap = EMPTY_MAP } = this.state;
+    const newColumnAlignmentMap = new Map(columnAlignmentMap);
+    if (alignment != null) {
+      newColumnAlignmentMap.set(column.name, alignment);
+    } else {
+      newColumnAlignmentMap.delete(column.name);
+    }
+    this.applyState('columnAlignmentMap', newColumnAlignmentMap);
   }
 
   handleMenu(e: React.MouseEvent<HTMLButtonElement>): void {
@@ -3525,18 +3531,18 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       return;
     }
 
-    this.setState(
-      {
-        // undo/redo will pass already parsed groups
-        // Parsing them again causes a loop with undo/redo that makes it unusable
-        columnHeaderGroups: columnHeaderGroups.every(
-          (group): group is ColumnHeaderGroup =>
-            isColumnHeaderGroup(group) && group.isValid()
-        )
-          ? columnHeaderGroups
-          : IrisGridUtils.parseColumnHeaderGroups(model, columnHeaderGroups)
-              .groups,
-      },
+    // undo/redo will pass already parsed groups
+    // Parsing them again causes a loop with undo/redo that makes it unusable
+    const newColumnHeaderGroups = columnHeaderGroups.every(
+      (group): group is ColumnHeaderGroup =>
+        isColumnHeaderGroup(group) && group.isValid()
+    )
+      ? columnHeaderGroups
+      : IrisGridUtils.parseColumnHeaderGroups(model, columnHeaderGroups).groups;
+    this.applyState(
+      'columnHeaderGroups',
+      newColumnHeaderGroups,
+      'internal',
       () => this.grid?.forceUpdate()
     );
   }
@@ -3609,16 +3615,19 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   handleConditionalFormatEditorSave(config: SidebarFormattingRule): void {
     log.debug('Save conditional format changes', config);
-    this.setState(
-      state => {
-        if (state.conditionalFormatEditIndex === null) {
-          log.debug('Invalid format index');
-          return null;
-        }
-        const conditionalFormats = [...state.conditionalFormats];
-        conditionalFormats[state.conditionalFormatEditIndex] = config;
-        return { conditionalFormats };
-      },
+    const { conditionalFormatEditIndex, conditionalFormats: prevFormats } =
+      this.state;
+    if (conditionalFormatEditIndex === null) {
+      log.debug('Invalid format index');
+      this.handleMenuBack();
+      return;
+    }
+    const conditionalFormats = [...prevFormats];
+    conditionalFormats[conditionalFormatEditIndex] = config;
+    this.applyState(
+      'conditionalFormats',
+      conditionalFormats,
+      'internal',
       () => {
         this.handleMenuBack();
       }
@@ -3852,15 +3861,17 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       this.startLoading(`Aggregating ${aggregation.operation}...`);
     }
 
-    this.setState(({ aggregationSettings }) => ({
+    const { aggregationSettings } = this.state;
+    const newAggregationSettings = {
+      ...aggregationSettings,
+      aggregations: aggregationSettings.aggregations.map(a =>
+        a.operation === aggregation.operation ? aggregation : a
+      ),
+    };
+    this.applyStateMany({
       selectedAggregation: aggregation,
-      aggregationSettings: {
-        ...aggregationSettings,
-        aggregations: aggregationSettings.aggregations.map(a =>
-          a.operation === aggregation.operation ? aggregation : a
-        ),
-      },
-    }));
+      aggregationSettings: newAggregationSettings,
+    });
   }
 
   /**
@@ -4012,22 +4023,22 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   removeEmptyAggregations(): void {
     log.debug('removeEmptyAggregations');
 
-    this.setState(({ aggregationSettings }) => {
-      const { aggregations } = aggregationSettings;
-      const newAggregations = aggregations.filter(
-        a => a.selected.length > 0 || a.invert
-      );
-      if (newAggregations.length !== aggregations.length) {
-        return {
-          selectedAggregation: null,
-          aggregationSettings: {
-            ...aggregationSettings,
-            aggregations: newAggregations,
-          },
-        };
-      }
-      return { selectedAggregation: null, aggregationSettings };
-    });
+    const { aggregationSettings } = this.state;
+    const { aggregations } = aggregationSettings;
+    const newAggregations = aggregations.filter(
+      a => a.selected.length > 0 || a.invert
+    );
+    if (newAggregations.length !== aggregations.length) {
+      this.applyStateMany({
+        selectedAggregation: null,
+        aggregationSettings: {
+          ...aggregationSettings,
+          aggregations: newAggregations,
+        },
+      });
+    } else {
+      this.setState({ selectedAggregation: null });
+    }
   }
 
   async seekRow(inputString: string, isBackwards = false): Promise<void> {
@@ -4285,11 +4296,14 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       );
     }
     const prev = this.state[field];
+    const skipEmit = this.isInitSnapshot;
     // Cast required because TS can't narrow Pick<State, K> from a
     // dynamic key without an explicit assertion.
     const partial = { [field]: value } as unknown as Pick<IrisGridState, K>;
     this.setState(partial, () => {
-      this.notifyStateChange(field, value, prev, source);
+      if (!skipEmit) {
+        this.notifyStateChange(field, value, prev, source);
+      }
       callback?.();
     });
   }
@@ -4312,23 +4326,26 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     callback?: () => void
   ): void {
     const prev = this.state;
+    const skipEmit = this.isInitSnapshot;
     this.setState(partial as Pick<IrisGridState, keyof IrisGridState>, () => {
-      (Object.keys(partial) as (keyof IrisGridState)[]).forEach(key => {
-        if (CONTROLLABLE_FIELDS[key as ControllableFieldName] == null) {
-          return;
-        }
-        const next = this.state[key];
-        const before = prev[key];
-        if (next === before) {
-          return;
-        }
-        this.notifyStateChange(
-          key as ControllableFieldName,
-          next as ControllableFieldValue<ControllableFieldName>,
-          before as ControllableFieldValue<ControllableFieldName>,
-          source
-        );
-      });
+      if (!skipEmit) {
+        (Object.keys(partial) as (keyof IrisGridState)[]).forEach(key => {
+          if (CONTROLLABLE_FIELDS[key as ControllableFieldName] == null) {
+            return;
+          }
+          const next = this.state[key];
+          const before = prev[key];
+          if (next === before) {
+            return;
+          }
+          this.notifyStateChange(
+            key as ControllableFieldName,
+            next as ControllableFieldValue<ControllableFieldName>,
+            before as ControllableFieldValue<ControllableFieldName>,
+            source
+          );
+        });
+      }
       callback?.();
     });
   }
