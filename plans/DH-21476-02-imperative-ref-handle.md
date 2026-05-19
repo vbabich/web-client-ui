@@ -1,13 +1,10 @@
-# Plan: Controllable IrisGrid — Branch A (Imperative Ref API)
+# Plan: Controllable IrisGrid — Imperative Ref Handle
 
-> **Status**: spike-ready (waiting on Phase 0 to land on `main`).
+> **Status**: ready to start once [Phase 0](./DH-21476-01-phase-0-foundation.md) is on `main`.
 > **Owner**: TBD.
-> **Working branch**: `spike/controllable-iris-grid-branch-a` off `main`.
-> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) all 7 items, green in CI.
-> **Spike scope**: see [process plan, Step 2](./DH-21476-00-process-and-decision.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed) —
-> 3-4 representative fields + the [Create Pivot plugin](./DH-21476-02-spike-create-pivot-plugin.md) as consumer; **don't migrate every field**, **don't migrate `FilterSetManagerPanel`**.
-> **Definition of Done (spike)**: 4 fields driven through `IrisGridHandle`; Create Pivot plugin builds against the spike; one-page evaluation memo committed to the spike branch (LOC, render counts, plugin DX, snapshot churn — see process plan).
-> **Companion branches**: [Branch B](./DH-21476-02-spike-branch-b-expanded-override.md), [Branch C](./DH-21476-03-spike-branch-c-idiomatic-react-rewrite.md).
+> **Working branch**: `feat/iris-grid-handle` off `main`.
+> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation) — registry, `applyState`, `onStateDidChange`, `IrisGridControlContext`, sidebar-nav fields. Phase 0.1 (handler migration) is not a hard prereq but the handle gets more useful as more fields migrate.
+> **Unblocks**: [Create Pivot plugin](./DH-21476-03-create-pivot-plugin.md), [Table Options sidebar plugin](./DH-21476-04-post-decision-table-options-plugin.md).
 > **Quick commands**:
 >
 > ```bash
@@ -17,7 +14,7 @@
 > ```
 >
 > Filename uses a descriptive slug; rename to
-> `DH-XXXXX-controllable-iris-grid-branch-a.md` once a ticket is opened.
+> `DH-XXXXX-iris-grid-handle.md` once a ticket is opened.
 
 ## Summary
 
@@ -32,29 +29,29 @@ duality. The handle is a **write channel**, the granular event is the
 **read channel**, and a thin `useIrisGridState(handle, selector)` hook
 bridges them for React consumers.
 
-## Branch-specific deltas (vs parent plan)
+## Design properties
 
 - Smallest behavioral change to `IrisGrid` internals — no inversion of
   state ownership.
 - Backward compatible: existing imperative methods keep working and are
   re-exported through the handle as canonical entry points.
 - RPC-friendly: every handle method takes serializable args (typings only;
-  no runtime serializer in scope).
-- **Out of scope here**: controlled-component semantics (Branch B);
-  per-field cleanups beyond the spike list; full Python RPC layer.
+  no runtime serializer in this plan).
+- **Out of scope here**: controlled-component semantics; full Python RPC
+  layer; full sidebar host extraction (see [Table Options sidebar plugin](./DH-21476-04-post-decision-table-options-plugin.md)).
 
 ## Prerequisites
 
-All seven items of [Phase 0 in the framework plan](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this).
-This branch will not start until Phase 0 lands and is green in CI. The
-sidebar host extraction (Phase 0 #7) is **not** a prerequisite — it is a
-consumer of this branch (see the [Table Options sidebar plugin plan](./DH-21476-04-post-decision-table-options-plugin.md))
+All items of [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation).
+This plan will not start until Phase 0 lands and is green in CI. The
+sidebar host extraction is **not** a prerequisite — it is a consumer
+(see the [Table Options sidebar plugin plan](./DH-21476-04-post-decision-table-options-plugin.md))
 and `openSidebar(option)` / `closeSidebar()` / `setOpenOptions(stack)`
 on the handle are derived automatically from the registered fields.
 
 ---
 
-## Phase A.1 — `forwardRef` boundary on `IrisGrid`
+## Phase 1 — `forwardRef` boundary on `IrisGrid`
 
 `IrisGrid` is a class component today. We don't rewrite it. Instead:
 
@@ -67,12 +64,12 @@ on the handle are derived automatically from the registered fields.
 3. `buildHandle(innerRef)` lives in
    `packages/iris-grid/src/controllable/IrisGridHandle.ts` and constructs
    the typed handle object. Each method delegates to the corresponding
-   `applyX(value, 'external')` on the inner instance.
+   `applyState(field, value, 'external')` on the inner instance.
 
 Existing direct ref consumers (e.g.
 [IrisGridPanel.irisGrid](../packages/dashboard-core-plugins/src/panels/IrisGridPanel.tsx))
 keep working **only** if they continue to access the few public class
-methods they already use. Audit and migrate those callers in Phase A.4 so
+methods they already use. Audit and migrate those callers in Phase 4 so
 they go through the handle instead — but keep both available during the
 deprecation window.
 
@@ -87,7 +84,7 @@ external consumers. Mitigate by exporting both types from
 
 ---
 
-## Phase A.2 — Define `IrisGridHandle`
+## Phase 2 — Define `IrisGridHandle`
 
 New file: `packages/iris-grid/src/controllable/IrisGridHandle.ts`.
 
@@ -145,8 +142,8 @@ export interface IrisGridHandle {
 
 Implementation rules:
 
-- Every setter delegates to `inner.applyX(value, 'external')`. No setter
-  reaches into `setState` directly.
+- Every setter delegates to `inner.applyState(field, value, 'external')`.
+  No setter reaches into `setState` directly.
 - `apply(patch)` iterates the patch in a deterministic order (registry
   order) so model-swap-triggering fields land before view fields.
 - `get` reads from a small snapshot view exposed by the inner class
@@ -157,7 +154,7 @@ Implementation rules:
 
 ---
 
-## Phase A.3 — Plumb the handle through panels
+## Phase 3 — Plumb the handle through panels
 
 ### `IrisGridPanel`
 
@@ -206,7 +203,7 @@ documented as legacy-ergonomic.
 
 ---
 
-## Phase A.4 — Migrate in-tree consumers
+## Phase 4 — Migrate in-tree consumers
 
 Two callers exercise the legacy ref API today:
 
@@ -230,7 +227,7 @@ Audit step: `grep -r "irisGrid\.\(handle\|set\)" --include='*.tsx'` in
 
 ---
 
-## Phase A.5 — Read-side helper: `useIrisGridState`
+## Phase 5 — Read-side helper: `useIrisGridState`
 
 New file:
 `packages/iris-grid/src/controllable/useIrisGridState.ts`.
@@ -258,7 +255,7 @@ helper for non-React consumers.
 
 ---
 
-## Phase A.6 — RPC seam (typings only, no runtime)
+## Phase 6 — RPC seam (typings only, no runtime)
 
 Add a generic RPC envelope type so a future Python bridge can serialize
 handle calls without redesigning the surface:
@@ -275,12 +272,12 @@ export type IrisGridHandleCall = {
 This is purely a type export. No runtime serializer ships in this plan.
 Document in the file header that any handle method added later **must**
 take JSON-serializable arguments, and lint via a custom test that
-JSON-stringifies a sample call for every method (covered in Phase C
-conformance).
+JSON-stringifies a sample call for every method (covered in the
+conformance suite below).
 
 ---
 
-## Phase A.7 — Deprecation & docs
+## Phase 7 — Deprecation & docs
 
 - Mark direct `IrisGrid` class ref usage `@deprecated` in JSDoc on
   `IrisGridInternalRef` alias.
@@ -289,7 +286,7 @@ conformance).
 - Update [packages/iris-grid/README.md](../packages/iris-grid/README.md)
   with a "Driving IrisGrid from a plugin" section showing the handle +
   `useIrisGridState` pattern.
-- Add a CHANGELOG entry under `feat:` once Phase 0 + A land together.
+- Add a CHANGELOG entry under `feat:` once the handle lands.
 
 Removal of deprecated APIs is deferred to a future major release per the
 framework plan's compat policy.
@@ -309,16 +306,16 @@ framework plan's compat policy.
   - Assert `get` reflects the new value synchronously after `setX`.
 - Loop-protection test: handler subscribes, on every event re-applies the
   same value via the handle. Must terminate within one tick (the inner
-  `applyX` should short-circuit when value is structurally equal).
+  `applyState` should short-circuit when value is structurally equal).
 - Snapshot round-trip test: dehydrate via `IrisGridUtils`, reapply via
   `handle.apply(rehydrate(...))`, compare snapshots.
 
-### Conformance suite (shared with Branch B)
+### Conformance suite
 
-`packages/iris-grid/src/controllable/Controllable.test.tsx` —
-parametrically iterate the registry; for each field assert the handle
-exposes the documented setter, observation works, and dehydrate/hydrate
-round-trips.
+`packages/iris-grid/src/controllable/Controllable.test.tsx` (the
+parametric suite seeded in Phase 0) gains handle-side assertions: for
+each registered field, the handle exposes the documented setter,
+observation works, and dehydrate/hydrate round-trips.
 
 ### E2E
 
@@ -340,7 +337,7 @@ Build `deephaven-plugins/plugins/ui` and
 | Risk | Mitigation |
 | --- | --- |
 | `forwardRef` change breaks consumers reading `React.ElementRef<typeof IrisGrid>` | Export `IrisGridInternalRef` alias and document migration in the same release. |
-| Handle drifts out of sync with new internal `applyX` mutators | Conformance test iterates the registry and asserts every field has a corresponding handle method. CI fails on missing entries. |
+| Handle drifts out of sync with new internal `applyState` mutators | Conformance test iterates the registry and asserts every field has a corresponding handle method. CI fails on missing entries. |
 | Plugins call handle methods before mount | Handle is `null` until the inner ref attaches; document and gate all examples on `if (handle)` / `useIrisGridState` returning `undefined`. |
 | RPC serializability silently broken by a non-JSON arg | Conformance test JSON-stringifies a representative call for every method. |
 | Class-component churn during the rename to `IrisGridInner` | Rename in a single commit, no behavior changes; rely on TypeScript + existing test suite for safety. |
@@ -361,7 +358,7 @@ Build `deephaven-plugins/plugins/ui` and
   — `irisGridRef` prop forwarding.
 - Modified: [packages/plugin/src/TablePlugin.ts](../packages/plugin/src/TablePlugin.ts)
   — `irisGrid: IrisGridHandle` on `TablePluginProps`.
-- Touched (Phase A.4 migration): every in-tree caller of `this.irisGrid.set*`
+- Touched (Phase 4 migration): every in-tree caller of `this.irisGrid.set*`
   / `this.irisGrid.handle*`.
 
 ---

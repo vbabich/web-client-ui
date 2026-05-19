@@ -1,14 +1,13 @@
 # Plan: JS-only "Create Pivot" Plugin in Table Options
 
-> **Status**: ready to start in parallel with the spike branches — this
-> plugin is the **shared spike consumer** referenced by the
-> [process plan, Step 2](./DH-21476-00-process-and-decision.md#step-2--spike-branches-for-a-and-b-parallel-time-boxed).
+> **Status**: ready to start once Phase 0 lands and the
+> [sidebar plugin extensibility](./DH-21476-05-sidebar-plugin-extensibility.md)
+> surface (menuItems / sidebar pages) is on `main`.
 > **Owner**: TBD (plugin lives in `deephaven-plugins/plugins/create-pivot/`).
 > **Working branch**: `feat/create-pivot-plugin` in `deephaven-plugins`;
-> framework slice (sidebar slot + optional `useSessionVariablesByType`)
-> ships from a separate PR in `web-client-ui`.
-> **Depends on**: a small slice of [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) (sidebar slot extension + `IrisGridControlContext` exposing `model`); coordination with the PivotService team for the type string and `createPivot` signature.
-> **Blocks / unblocks**: the spike memos for [Branch A](./DH-21476-02-spike-branch-a-imperative-ref.md) and [Branch B](./DH-21476-02-spike-branch-b-expanded-override.md) consume this plugin as their evaluation harness; build it as **branch-agnostic** so the same plugin code runs against both spikes with one import swap.
+> framework slice (optional `useSessionVariablesByType`) ships from a
+> separate PR in `web-client-ui`.
+> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation) (registry + `IrisGridControlContext` exposing `model`); the sidebar menu/page extension point from [DH-21476-05](./DH-21476-05-sidebar-plugin-extensibility.md); coordination with the PivotService team for the type string and `createPivot` signature.
 > **Definition of Done**: "Create Pivot" entry appears in Table Options on flat tables, enabled when a `PivotService` is reachable; submit calls `pivotService.createPivot(...)` and opens the resulting widget; full Jest + one Playwright suite green; documented in the plugin's README.
 > **Quick commands**:
 >
@@ -39,8 +38,8 @@
 
 ## Goals
 
-- Validate the framework against a **minimal** consumer (one menu item, one sidebar page, no controllable-state writes back into the grid).
-- Produce a real, shippable plugin; do not throw it away after evaluation.
+- Exercise the sidebar-extensibility surface with a **minimal real** consumer (one menu item, one sidebar page, no writes back into the grid).
+- Produce a real, shippable plugin.
 - **Ship a single bundle that works in both DHE and OSS**, using OSS's `subscribeToFieldUpdates` as the baseline and feature-detecting the DHE-only `querySerial` to narrow scope. Pivots themselves are currently DHE-only; OSS support is forward-looking but the plugin should not be edition-locked.
 - Surface any small API gaps for cleaner sibling-variable discovery (e.g. an edition-agnostic `useSessionVariablesByType(type)` hook), but **do not block on them** — the plugin can be built directly against `subscribeToFieldUpdates` today.
 
@@ -54,9 +53,9 @@
 
 ## Required framework support
 
-This plugin is much smaller than the sidebar-replacement consumer in the companion plan. It needs only a subset of Phase 0 from [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md):
+This plugin needs only a small subset of the framework:
 
-1. **Sidebar-slot extension point** (the `sidebarPages` + `menuItems` props described in [DH-21476-04-post-decision-table-options-plugin.md § Required additions](./DH-21476-04-post-decision-table-options-plugin.md)). Without `menuItems` the plugin can't append an entry; without `sidebarPages` it can't render its own page when that entry is selected. **Mandatory.**
+1. **Sidebar menu + page extension point** — the `sidebarItems` transform and the `configPage` slot on `OptionItem` shipped in [DH-21476-05](./DH-21476-05-sidebar-plugin-extensibility.md). Without them the plugin can't append an entry or render its own page. **Mandatory.**
 2. **Read-only access to the source `IrisGridModel`** via `IrisGridControlContext` (Phase 0 #6). The plugin needs the column list, table schema, and a handle to the underlying `dh.Table`. The framework already exposes the model on `TablePluginProps.model` — this just needs to keep working.
 3. **Sibling-variable discovery — already supported in OSS.** Both editions expose `dh.IdeConnection.subscribeToFieldUpdates(callback)`, which delivers `dh.ide.VariableChanges` (`{ created, updated, removed }` arrays). The plugin filters by `definition.type === 'PivotService'`. Access path:
    - The TablePlugin's React subtree can call `useConnection()` from `@deephaven/app-utils` (the same hook the console uses) to obtain the `IdeConnection` shared with the source table. No new field on `TablePluginProps` is strictly required for v1.
@@ -70,24 +69,7 @@ This plugin is much smaller than the sidebar-replacement consumer in the compani
      ```
      Implementation calls `subscribeToFieldUpdates`, accumulates current variables matching `type`, and (when `opts.querySerial` is provided **and** the variable definitions carry one — DHE only) narrows to that query. OSS callers omit `querySerial`; DHE callers pass it through and degrade gracefully if `querySerial` is missing on the discovered definitions.
    - DHE-specific narrowing: pass `model.table.getAttributes?.querySerial` (or whatever the canonical accessor turns out to be — verify in iris) into the helper. **Do not import any DHE-only package from this plugin** — stay on the public OSS API plus feature detection.
-4. **Nothing else.** This plugin does not write to any controllable field, so the A-vs-B distinction barely matters for state plumbing. Build it branch-agnostic; the spike memos use it as their plugin-DX harness.
-
----
-
-## Branch implications (short)
-
-Both Branches A and B handle this consumer with comparable plugin code
-(~400 lines either way) because the plugin is read-only against the
-grid. Branch C — if it wins — lets the same plugin shrink slightly
-(one hook for everything) but does not change the API surface this
-plugin uses. **Build the plugin once against Phase 0 + the existing
-`subscribeToFieldUpdates` primitive; rebind the read path with a
-one-line import swap whichever branch is picked.**
-
-The full A-vs-B comparison the spike memos produce will use this
-plugin's actual development time and re-render counts as data points,
-so keep the implementation faithful to what a real plugin author would
-write (no special-case shortcuts).
+4. **Nothing else.** This plugin does not write to any controllable field. The [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) is not used here — build it directly against the sidebar surface and `useConnection()`.
 
 ---
 
@@ -97,16 +79,16 @@ Six small PRs, all but the first in `deephaven-plugins`. Total scope is small en
 
 ### Milestone 0 — Framework prerequisites (web-client-ui, 1 PR)
 
-- Land just the slice of [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md) Phase 0 needed here:
-  - Sidebar-slot extension (`sidebarPages`, `menuItems`) — see [DH-21476-04-post-decision-table-options-plugin.md § Required additions](./DH-21476-04-post-decision-table-options-plugin.md). The `OptionItem` type ([sidebar/](../packages/iris-grid/src/sidebar/index.ts)) needs to gain an optional `disabled?: boolean` and `tooltip?: ReactNode` so the plugin can render the disabled-with-tooltip state described above. Confirm whether the existing `Menu`/`Page` primitives already render a disabled state — if not, extend them.
+- Land the slice of [DH-21476-05](./DH-21476-05-sidebar-plugin-extensibility.md) needed here:
+  - The `sidebarItems` transform prop and the `configPage` slot on `OptionItem`. The `OptionItem` type ([sidebar/](../packages/iris-grid/src/sidebar/index.ts)) needs to additionally gain an optional `disabled?: boolean` and `tooltip?: ReactNode` so the plugin can render the disabled-with-tooltip state described above. Confirm whether the existing `Menu`/`Page` primitives already render a disabled state — if not, extend them.
   - **Optional but recommended**: add a `useSessionVariablesByType(type, opts?)` hook to [packages/jsapi-utils](../packages/jsapi-utils) wrapping `connection.subscribeToFieldUpdates`. Edition-agnostic; DHE narrowing via the optional `querySerial` arg. Skip if it adds friction — the plugin can call `subscribeToFieldUpdates` directly.
-- No `applyX` normalization needed yet — this plugin doesn't write.
-- Tests: Jest test that a custom `menuItems` adds an entry and a custom `sidebarPages` page renders when selected; Jest test that a disabled `OptionItem` renders with its tooltip and does not open a page on click; if the helper hook lands, a small Jest test for it against a mocked `IdeConnection`.
+- No `applyState` normalization needed yet — this plugin doesn't write.
+- Tests: Jest test that a custom `sidebarItems` transform adds an entry whose `configPage` renders when selected; Jest test that a disabled `OptionItem` renders with its tooltip and does not open a page on click; if the helper hook lands, a small Jest test for it against a mocked `IdeConnection`.
 
 ### Milestone 1 — Plugin scaffold (deephaven-plugins, 1 PR)
 
 - New package `deephaven-plugins/plugins/create-pivot/` (JS-only — no Python module). Use the existing JS plugin scaffold; consult the [build-plugin skill](../../deephaven-plugins/.github/skills/build-plugin/SKILL.md) for the standard layout.
-- Registers a `TablePlugin` that supplies `menuItems` and `sidebarPages`. Initially the `menuItems` callback always appends a stub "Create Pivot" entry; selecting it opens an empty page that just says "TODO".
+- Registers a `WidgetMiddlewarePlugin` (per [DH-21476-05](./DH-21476-05-sidebar-plugin-extensibility.md)) that contributes a `sidebarItems` transform appending a "Create Pivot" entry with its own `configPage`. Initially the page just says "TODO".
 - E2E (`npm run e2e:docker`): open Table Options on any flat table, assert "Create Pivot" appears, click it, assert the empty page renders.
 
 ### Milestone 2 — Eligibility gating (1 PR)
@@ -170,16 +152,16 @@ Tests: Jest unit tests with a mocked `IdeConnection` driving `subscribeToFieldUp
 6. **Multiple `PivotService` instances.** Possible in either edition (different backends, different permissions). v1: if exactly one, use implicitly; if multiple, show a small selector at the top of the builder page; if zero, disabled-with-tooltip per Milestone 2.
 7. **Hierarchical detection edge cases.** A flat table with a `customColumns` formula is still flat (pivotable). A flat table during rollup *configuration* (rollup config set but not yet applied) is racy — gate on the *current model*, not the in-flight rollup config. Test this explicitly.
 8. **Panel reopens.** When the source table is reopened from a saved layout, the plugin must re-attach to it and re-establish its `subscribeToFieldUpdates` subscription. The framework's `TablePlugin` lifecycle already handles mount/unmount; add an explicit Jest test that mounts → unmounts → remounts the plugin against a stubbed connection and asserts the menu entry is correctly re-evaluated.
-9. **Branch flip cost.** Because this plugin is Branch-agnostic, the only cost of flipping later is one import path change (`useIrisGridState` from the chosen package). Acceptable.
+9. **Replan if the sidebar surface needs more.** The plugin should fit cleanly inside the API shipped by [DH-21476-05](./DH-21476-05-sidebar-plugin-extensibility.md). If it doesn't, the friction is data that feeds back into that plan.
 
 ---
 
 ## Decision
 
-Build this plugin **before** the framework picks A vs B. It exercises:
+Build this plugin **once the sidebar extensibility surface is on `main`**. It exercises:
 
-- The sidebar-slot extension, including the new `disabled` + `tooltip` `OptionItem` fields (shared by both branches).
-- Edition-agnostic sibling-variable discovery via the existing OSS `subscribeToFieldUpdates` primitive, with feature-detected DHE narrowing by `querySerial` — independent of both branches.
-- The cross-plugin coordination story (`TablePlugin` + `WidgetPlugin` + a backend service variable surfaced through the session).
+- The sidebar-items transform and the `configPage` slot, including the proposed `disabled` + `tooltip` `OptionItem` fields.
+- Edition-agnostic sibling-variable discovery via the existing OSS `subscribeToFieldUpdates` primitive, with feature-detected DHE narrowing by `querySerial`.
+- The cross-plugin coordination story (`WidgetMiddlewarePlugin` + `WidgetPlugin` + a backend service variable surfaced through the session).
 
-…and it does so without taking a position on the controllability model. If it proves easy to build, that's evidence Phase 0 + the OSS discovery primitive is the right minimal foundation. If it proves hard, the friction will tell us which Phase 0 piece needs more work.
+If it proves easy to build, that's evidence Phase 0 + DH-21476-05 + the OSS discovery primitive is the right minimal foundation. If it proves hard, the friction will tell us which piece needs more work.

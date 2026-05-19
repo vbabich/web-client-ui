@@ -1,12 +1,11 @@
 # Plan: Sidebar plugin extensibility via widget middleware
 
-> **Status**: design — chosen next deliverable for branch `vlad-DH-21476-o4.7`.
+> **Status**: design — active deliverable for branch `vlad-DH-21476-o4.7`.
 > Builds directly on [Phase 0](./DH-21476-01-phase-0-foundation.md) (registry + `IrisGridControlContext`).
-> Sequencing question for spike branches A/B/C is **paused** while we ship this; see [process plan](./DH-21476-00-process-and-decision.md).
 > **Owner**: TBD.
 > **Depends on**: Phase 0 (merged on this branch) and the existing
 > [`WidgetMiddlewarePlugin`](../packages/plugin/src/PluginTypes.ts) infrastructure
-> ([CHANGELOG note for #2660](../CHANGELOG.md)). Does **not** require Phase 0.1.
+> ([CHANGELOG note for #2660](../CHANGELOG.md)). Does **not** require Phase 0.1 or the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md).
 > **Spans repos**: `web-client-ui` (Phases 1–2) + `deephaven-plugins` (Phase 3).
 > **Supersedes for this branch**: the "add/hide menu items" subset of
 > [DH-21476-04 — Table Options sidebar plugin](./DH-21476-04-post-decision-table-options-plugin.md).
@@ -313,7 +312,7 @@ npm run e2e:docker -- ./tests/grid-sidebar-example.spec.ts --reporter=list
 
 - [Phase 0 foundation](./DH-21476-01-phase-0-foundation.md): provides `IrisGridControlContext`, which plugin pages use when they want to mutate registered grid fields. The Notes example doesn't need it; the next plugin that does will. **Already merged on this branch.**
 - [Phase 0.1 handler migration](./DH-21476-01-phase-0-foundation.md#phase-01--handler-migration): independent. Sidebar plugin pages bypass legacy handlers by going through `IrisGridControlContext.apply`. Not a prereq here.
-- [Branch A / B / C spikes](./DH-21476-00-process-and-decision.md): **paused.** Once real plugin consumers exist via this plan, the constraints those branches were designed to evaluate become concrete and a final decision can use real data instead of synthetic spikes.
+- [Imperative ref handle (DH-21476-02)](./DH-21476-02-imperative-ref-handle.md): orthogonal. The middleware never holds an `IrisGridHandle`; it only contributes items. Plugin pages that need to drive registered fields use `IrisGridControlContext` directly. The handle plan is the consumer-side surface that ships in parallel.
 - [Plan 04 — Table Options sidebar plugin](./DH-21476-04-post-decision-table-options-plugin.md): full sidebar-host extraction. Subsumes this plan's surface as a special case. Remains the long-term target; this plan is the minimum viable subset that ships now and exercises the contract.
 
 ## Open questions

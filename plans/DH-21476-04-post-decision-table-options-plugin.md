@@ -1,6 +1,6 @@
 # Plan: Plugin Replacement of the Table Options Sidebar
 
-> **Status**: blocked on the chosen controllability branch landing on `main`.
+> **Status**: blocked on the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) landing on `main`.
 > **Narrow subset shipping now**: the add/hide-item subset of this plan
 > is delivered on branch `vlad-DH-21476-o4.7` via
 > [DH-21476-05 — sidebar plugin extensibility](./DH-21476-05-sidebar-plugin-extensibility.md).
@@ -9,7 +9,7 @@
 > page replacement).
 > **Owner**: TBD (the plugin lives in `deephaven-plugins/plugins/table-options/`).
 > **Working branch**: `feat/table-options-plugin` in `deephaven-plugins`; framework changes go through PRs in `web-client-ui`.
-> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation-both-branches-build-on-this) **and** the winning controllability branch ([A](./DH-21476-02-spike-branch-a-imperative-ref.md), [B](./DH-21476-02-spike-branch-b-expanded-override.md), or [C](./DH-21476-03-spike-branch-c-idiomatic-react-rewrite.md)).
+> **Depends on**: [Phase 0](./DH-21476-01-phase-0-foundation.md#phase-0--shared-foundation) **and** the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md).
 > **Definition of Done**: every `OptionType` in the table below has a working plugin replacement; built-in pages remain available as the default; render-count regression test green; documentation in `deephaven-plugins/plugins/table-options/README.md`.
 > **Quick commands**:
 >
@@ -62,12 +62,12 @@ A plugin that "implements all functionality" must therefore: (a) **render its ow
 
 ## Required additions to the framework plan
 
-**Why this can't ship as a Phase 0 refactor.** The built-in sidebar pages ([RollupRows](../packages/iris-grid/src/sidebar/RollupRows.tsx), [AggregationsBuilder](../packages/iris-grid/src/sidebar/aggregations), [VisibilityOrderingBuilder](../packages/iris-grid/src/sidebar/visibility-ordering-builder), etc.) call `this.handleX` / `this.setState` directly on the `IrisGrid` class. Extracting them into a parent-rendered slot before the controllability framework exists would just turn private state coupling into a tangle of callback props piped across the new boundary — reinventing the very API Branch A or B is supposed to define. So Phase 0 only does the safe pieces (normalize sidebar mutators through `applyX`, register `isMenuShown` / `openOptions` as controllable fields). Full extraction lives **here**, on top of the chosen branch.
+**Why this can't ship as a Phase 0 refactor.** The built-in sidebar pages ([RollupRows](../packages/iris-grid/src/sidebar/RollupRows.tsx), [AggregationsBuilder](../packages/iris-grid/src/sidebar/aggregations), [VisibilityOrderingBuilder](../packages/iris-grid/src/sidebar/visibility-ordering-builder), etc.) call `this.handleX` / `this.setState` directly on the `IrisGrid` class. Extracting them into a parent-rendered slot before the controllability framework exists would just turn private state coupling into a tangle of callback props piped across the new boundary — reinventing the very API the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) is supposed to define. So Phase 0 only does the safe pieces (normalize sidebar mutators through `applyState`, register `isMenuShown` / `openOptions` as controllable fields). Full extraction lives **here**, on top of the handle.
 
-### Phase 1 — Extract the sidebar host (after Branch A or B lands)
+### Phase 1 — Extract the sidebar host (after the handle lands)
 
 1. Create `packages/iris-grid/src/sidebar/IrisGridSidebar.tsx`. It owns the `<Stack>` / `<Page>` rendering and the `OptionType → component` mapping currently inline in [IrisGrid.tsx#L5394](../packages/iris-grid/src/IrisGrid.tsx#L5394) and [getCachedOptionItems](../packages/iris-grid/src/IrisGrid.tsx#L1168). Built-in pages move with it.
-2. Rewrite each built-in page to consume `IrisGridControlContext` for reads/writes instead of receiving private callbacks. With Branch A this means `useIrisGridState` + `handle.applyX`; with Branch B it means props derived from `getEffectiveState()` + `applyOverride`. Either way the page's source of truth is the public framework API — the same one a plugin would use.
+2. Rewrite each built-in page to consume `IrisGridControlContext` for reads/writes instead of receiving private callbacks: `useIrisGridState` for reads + `handle.applyState` / specific setters for writes. The page's source of truth is the public framework API — the same one a plugin would use.
 3. `IrisGrid` keeps the toolbar gear button and the menu open/close state (already controllable from Phase 0 #7). It accepts a `renderSidebar?: (defaults: IrisGridSidebarProps) => ReactNode` prop. Default mounts `<IrisGridSidebar {...defaults} />` so behavior is unchanged.
 4. Workspace-level callbacks (`onAdvancedSettingsChange`, `onCreateChart`, CSV worker fetch) flow through `IrisGridControlContext`; they remain callbacks, not state.
 
@@ -84,18 +84,10 @@ A plugin that "implements all functionality" must therefore: (a) **render its ow
 
 ---
 
-## Branch evaluation
+## Demands on the imperative ref handle
 
-Detailed A-vs-B-vs-C scoring against this consumer is **not** speculated
-here — the spike branches in the [process plan](./DH-21476-00-process-and-decision.md)
-produce real numbers that beat any up-front guess. The process plan
-recommends using a smaller [Create Pivot plugin](./DH-21476-02-spike-create-pivot-plugin.md)
-as the spike consumer (faster signal, no scratch-state hazards). This
-full-sidebar plugin is the **second** consumer, built on top of the
-branch the spikes pick — not an evaluation tool.
-
-Key demands this consumer places on the chosen branch (regardless of
-which one wins) — use this list when reviewing the spike memos:
+This consumer is the most demanding plugin built on top of
+[DH-21476-02](./DH-21476-02-imperative-ref-handle.md). It exercises:
 
 - Atomic multi-field updates for visibility/ordering (`movedColumns` +
   `userColumnWidthsByName` + `frozenColumns` + `columnHeaderGroups`
@@ -107,17 +99,18 @@ which one wins) — use this list when reviewing the spike memos:
   is grid-owned, not a controlled field).
 - Stable-reference memoization: a 30-field round-trip on every render
   must not retrigger model fetches.
-- Derived-field handling: `searchFilter` is read-only in the registry.
+- Derived-field handling: `searchFilter` is read-only (recomputed from
+  registered sources).
 
 ---
 
 ## Implementation plan for the plugin
 
-Assumes the framework's Phase 0 has landed and *one* of A/B has been picked. Plan is staged so the same milestones apply to either branch — only the binding code at each step differs.
+Assumes Phase 0 and the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) have landed.
 
 ### Milestone 0 — Plumbing (1 PR, web-client-ui)
 
-- Land Phase 0 additions from [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md): registry, `applyX` normalization, `onStateDidChange`, `IrisGridControlContext`, `modelFactory` prop on panel.
+- Land Phase 0 additions from [DH-21476-01-phase-0-foundation.md](./DH-21476-01-phase-0-foundation.md): registry, `applyState` normalization, `onStateDidChange`, `IrisGridControlContext`, `modelFactory` prop on panel.
 - Land the **sidebar-slot extension** described above (`sidebarPages`, `menuItems`, controllable `isMenuShown` + `openOptions`).
 - Add a smoke test: render `<IrisGrid sidebarPages={{}}>` and assert built-in pages still work (regression guard).
 
@@ -142,7 +135,7 @@ Replace in this order (lowest to highest blast radius):
 5. `CONDITIONAL_FORMATTING` (with `_EDIT`) — exercises preview state (which is plugin-owned, not in the registry).
 6. `VISIBILITY_ORDERING_BUILDER` — multi-field atomic updates. The hardest case; first real test of the batching story.
 
-Each step: plugin page + state binding + Jest test + one Playwright e2e. After each PR, run the conformance suite from Phase C of the framework plan to confirm no regressions in non-replaced fields.
+Each step: plugin page + state binding + Jest test + one Playwright e2e. After each PR, run the conformance suite from Phase 0 of the framework plan to confirm no regressions in non-replaced fields.
 
 ### Milestone 4 — Workspace/long-running features (1 PR)
 
@@ -157,7 +150,7 @@ Each step: plugin page + state binding + Jest test + one Playwright e2e. After e
 
 ### Milestone 6 — Hardening (1 PR)
 
-- Performance pass: render-count instrumentation in the conformance suite. Threshold: ≤ N renders per `applyX` (set N empirically from a pre-plugin baseline).
+- Performance pass: render-count instrumentation in the conformance suite. Threshold: ≤ N renders per `applyState` (set N empirically from a pre-plugin baseline).
 - Run the full `simple-pivot` and `ui` plugin test suites against the new `iris-grid` to confirm no compatibility breakage.
 - Documentation: README in the new plugin package, plus a "Replacing the Table Options sidebar" section in the iris-grid plugin docs.
 
