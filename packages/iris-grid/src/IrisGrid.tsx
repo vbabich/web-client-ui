@@ -326,7 +326,7 @@ export interface IrisGridProps {
   /**
    * Phase 0 controllable-state change event. Fires once per registered
    * field whose value changed via the canonical `applyState` pipe.
-   * Source is `'user'` for internal handlers and `'external'` for
+   * Source is `'internal'` for internal handlers and `'external'` for
    * writes coming from `IrisGridControlContext.apply`. See
    * `controllable/ControllableFields.ts` for the registry.
    */
@@ -1804,7 +1804,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   }
 
   setAdvancedFilterMap(advancedFilters: ReadonlyAdvancedFilterMap): void {
-    this.setState({ advancedFilters });
+    this.applyState('advancedFilters', advancedFilters);
   }
 
   setAdvancedFilter(
@@ -1967,7 +1967,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   clearAllAggregations(): void {
     log.debug('Clearing all aggregations');
 
-    this.setState({ aggregationSettings: DEFAULT_AGGREGATION_SETTINGS });
+    this.applyState('aggregationSettings', DEFAULT_AGGREGATION_SETTINGS);
   }
 
   clearCrossColumSearch(): void {
@@ -2674,7 +2674,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    * @param frozenColumns The new list of frozen columns
    */
   handleFrozenColumnsChanged(frozenColumns: readonly ColumnName[]): void {
-    this.setState({ frozenColumns });
+    this.applyState('frozenColumns', frozenColumns);
   }
 
   toggleExpandColumn(
@@ -2822,7 +2822,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     this.startLoading('Partitioning...');
     const { partitionConfig: prevConfig } = this.state;
     if (prevConfig !== partitionConfig) {
-      this.setState({ partitionConfig });
+      this.applyState('partitionConfig', partitionConfig);
     }
   }
 
@@ -2914,7 +2914,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
 
   updateSorts(sorts: readonly SortDescriptor[]): void {
     this.startLoading('Sorting...');
-    this.setState({ sorts });
+    this.applyState('sorts', sorts);
     this.grid?.forceUpdate();
   }
 
@@ -2935,13 +2935,13 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
       addToExisting
     );
     this.startLoading('Sorting...');
-    this.setState({ sorts });
+    this.applyState('sorts', sorts);
     this.grid?.forceUpdate();
   }
 
   reverse(reverse: boolean): void {
     this.startLoading('Reversing...');
-    this.setState({ reverse });
+    this.applyState('reverse', reverse);
     this.grid?.forceUpdate();
   }
 
@@ -2953,7 +2953,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   toggleFilterBar(focusIndex = this.lastFocusedFilterBarColumn): void {
     let { isFilterBarShown } = this.state;
     isFilterBarShown = !isFilterBarShown;
-    this.setState({ isFilterBarShown });
+    this.applyState('isFilterBarShown', isFilterBarShown);
 
     if (isFilterBarShown) {
       if (focusIndex != null) {
@@ -3216,7 +3216,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     log.info('Setting table sorts', sorts);
 
     this.startLoading('Sorting...');
-    this.setState({ sorts });
+    this.applyState('sorts', sorts);
 
     this.grid?.forceUpdate();
   }
@@ -3230,11 +3230,17 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   }
 
   handleGotoRowOpened(): void {
-    this.setState({ isGotoShown: true, gotoValueManuallyChanged: false });
+    const { isGotoShown: prev } = this.state;
+    this.setState({ isGotoShown: true, gotoValueManuallyChanged: false }, () =>
+      this.notifyStateChange('isGotoShown', true, prev)
+    );
   }
 
   handleGotoRowClosed(): void {
-    this.setState({ isGotoShown: false, gotoValueManuallyChanged: false });
+    const { isGotoShown: prev } = this.state;
+    this.setState({ isGotoShown: false, gotoValueManuallyChanged: false }, () =>
+      this.notifyStateChange('isGotoShown', false, prev)
+    );
   }
 
   handleAdvancedMenuClosed(columnIndex: number): void {
@@ -3383,7 +3389,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     if (isMissingPartitionError(error) && partitionConfig != null) {
       // We'll try loading the initial partition again
       this.startLoading('Reloading partition...', { resetRanges: true });
-      this.setState({ partitionConfig: undefined }, () => {
+      this.applyState('partitionConfig', undefined, 'internal', () => {
         this.initState();
       });
     } else if (this.canRollback()) {
@@ -3436,7 +3442,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   handleTableChanged(): void {
     const { model } = this.props;
     // movedColumns reset triggers metricCalculator update in the Grid component
-    this.setState({ movedColumns: model.initialMovedColumns });
+    this.applyState('movedColumns', model.initialMovedColumns);
     // For partitioned tables, we want to rebuild filters on table change to ensure filters are applied to the new partition
     const { partitionConfig } = this.state;
     if (isPartitionedGridModel(model) && partitionConfig?.mode !== 'keys') {
@@ -3503,7 +3509,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     movedColumns: readonly MoveOperation[],
     onChangeApplied?: () => void
   ): void {
-    this.setState({ movedColumns }, onChangeApplied);
+    this.applyState('movedColumns', movedColumns, 'internal', onChangeApplied);
   }
 
   handleHeaderGroupsChanged(
@@ -3544,7 +3550,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     conditionalFormats: readonly SidebarFormattingRule[]
   ): void {
     log.debug('Updated conditional formats', conditionalFormats);
-    this.setState({ conditionalFormats });
+    this.applyState('conditionalFormats', conditionalFormats);
   }
 
   handleConditionalFormatCreate(): void {
@@ -3670,7 +3676,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
         );
       if (newSorts.length !== sorts.length) {
         log.debug('removing sorts from removed custom columns...');
-        this.setState({ sorts: newSorts });
+        this.applyState('sorts', newSorts);
       }
       if (
         newQuickFilters.size !== quickFilters.size ||
@@ -3687,18 +3693,18 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
           `change moved columns for removed custom columns`,
           newMovedColumns
         );
-        this.setState({ movedColumns: newMovedColumns });
+        this.applyState('movedColumns', newMovedColumns);
       }
       if (!deepEqual(selectDistinctColumns, newSelectDistinctColumns)) {
         log.debug(
           `change selectDistinct columns for removed custom columns`,
           newMovedColumns
         );
-        this.setState({ selectDistinctColumns: newSelectDistinctColumns });
+        this.applyState('selectDistinctColumns', newSelectDistinctColumns);
       }
     }
 
-    this.setState({ customColumns });
+    this.applyState('customColumns', customColumns);
     if (customColumns.length > 0) {
       // If there are no custom columns, the change handler never fires
       // This causes the loader to stay until canceled by the user
@@ -3822,7 +3828,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
           .join(', ')}...`
       );
     }
-    this.setState({ aggregationSettings });
+    this.applyState('aggregationSettings', aggregationSettings);
   }
 
   /**
@@ -4252,7 +4258,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
    *   - the new `onStateDidChange` prop
    *   - any listeners registered through `IrisGridControlContext`
    *
-   * Internal handlers should call `applyState(field, value, 'user')`
+   * Internal handlers should call `applyState(field, value, 'internal')`
    * instead of `this.setState({ [field]: value })`. External writes
    * coming through `IrisGridControlContext.apply` always tag the
    * change with `'external'`.
@@ -4265,7 +4271,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
   applyState<K extends ControllableFieldName>(
     field: K,
     value: ControllableFieldValue<K>,
-    source: ControllableSource = 'user',
+    source: ControllableSource = 'internal',
     callback?: () => void
   ): void {
     if (CONTROLLABLE_FIELDS[field] == null) {
@@ -4298,7 +4304,7 @@ class IrisGrid extends Component<IrisGridProps, IrisGridState> {
     field: K,
     value: ControllableFieldValue<K>,
     prev: ControllableFieldValue<K>,
-    source: ControllableSource = 'user'
+    source: ControllableSource = 'internal'
   ): void {
     const change: IrisGridStateChange<K> = {
       field,

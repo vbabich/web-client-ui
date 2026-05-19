@@ -70,7 +70,7 @@ export type ControllableSerialization =
  *                Allows external code to distinguish its own writes
  *                from user changes without diffing the snapshot.
  */
-export type ControllableSource = 'user' | 'external';
+export type ControllableSource = 'internal' | 'external';
 
 /**
  * Public spec for one controllable field. The `name` matches the key

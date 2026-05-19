@@ -166,7 +166,7 @@ describe('Controllable IrisGrid registry', () => {
 });
 
 describe('IrisGrid.applyState pipe', () => {
-  it('updates state and fires onStateDidChange tagged with source=user', () => {
+  it('updates state and fires onStateDidChange tagged with source=internal', () => {
     const onStateDidChange = jest.fn();
     const { grid } = makeGrid({ onStateDidChange });
 
@@ -180,7 +180,7 @@ describe('IrisGrid.applyState pipe', () => {
     expect(change.field).toBe('isFilterBarShown');
     expect(change.value).toBe(true);
     expect(change.prev).toBe(false);
-    expect(change.source).toBe('user');
+    expect(change.source).toBe('internal');
     expect(change.snapshot().isFilterBarShown).toBe(true);
   });
 
@@ -194,13 +194,43 @@ describe('IrisGrid.applyState pipe', () => {
         // Bypass type-check: this is the runtime guard we want to test.
         (
           grid as unknown as { applyState: (...a: unknown[]) => void }
-        ).applyState('selectedRanges', [], 'user');
+        ).applyState('selectedRanges', [], 'internal');
       });
       // The state update still happens via setState.
       expect(grid.state.selectedRanges).toEqual([]);
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('routes the public `reverse()` handler through applyState', () => {
+    const { grid } = makeGrid();
+    // Stub applyState so the model updater (which would call
+    // `dh.Table.reverse`, not present on the mock) never sees a state
+    // change. We only need to assert the migration target was called.
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+
+    act(() => {
+      grid.reverse(true);
+    });
+
+    expect(spy).toHaveBeenCalledWith('reverse', true);
+  });
+
+  it('routes the public `updateSorts()` handler through applyState', () => {
+    const { grid } = makeGrid();
+    const spy = jest
+      .spyOn(grid, 'applyState')
+      .mockImplementation(() => undefined);
+    const nextSorts: never[] = [];
+
+    act(() => {
+      grid.updateSorts(nextSorts);
+    });
+
+    expect(spy).toHaveBeenCalledWith('sorts', nextSorts);
   });
 });
 

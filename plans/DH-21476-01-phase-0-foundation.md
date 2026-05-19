@@ -32,7 +32,7 @@ These changes are prerequisites for the imperative-ref handle and for every side
 Phase 0 is intentionally **plumbing only**: registry + canonical mutator + granular event + context + sidebar nav + `modelFactory`. The mechanical migration of every existing `handleX` / `setX` / direct `setState` call site to the new pipe is deferred to **Phase 0.1** so Phase 0 stays a small, reviewable PR.
 
 1. **Inventory the controllable surface.** Produce a typed registry (`packages/iris-grid/src/controllable/ControllableFields.ts`) enumerating every state field with metadata: name, current `IrisGridState` field, current `IrisGridProps` initializer (if any), category (`filter | sort | structure | rollup | format | view`), whether it triggers a model swap, dehydrate codec reference. Use the union of `IrisGridState` ([IrisGrid.tsx](../packages/iris-grid/src/IrisGrid.tsx)) and `IrisGridStateOverride` ([CommonTypes.tsx#L93](../packages/iris-grid/src/CommonTypes.tsx#L93)). This becomes the spec doc the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) must satisfy.
-2. **Introduce a canonical mutator.** Today there is a mix of `handleXChange`, `setX`, and direct `setState` orchestrators. Add a single generic `applyState<K extends ControllableFieldName>(field, value, source)` method on `IrisGrid` where `source ∈ 'user' | 'external'`. Internal handlers will call `applyState(field, value, 'user')`; the external `IrisGridControlHandle.apply` calls `applyState(field, value, 'external')`. This avoids recursion hazards (override → setState → onStateChange → override loop). Phase 0 only **adds** `applyState` and routes the sidebar-nav fields through it; the full migration of existing handlers is Phase 0.1.
+2. **Introduce a canonical mutator.** Today there is a mix of `handleXChange`, `setX`, and direct `setState` orchestrators. Add a single generic `applyState<K extends ControllableFieldName>(field, value, source)` method on `IrisGrid` where `source ∈ 'internal' | 'external'`. Internal handlers will call `applyState(field, value, 'internal')`; the external `IrisGridControlHandle.apply` calls `applyState(field, value, 'external')`. This avoids recursion hazards (override → setState → onStateChange → override loop). Phase 0 only **adds** `applyState` and routes the sidebar-nav fields through it; the full migration of existing handlers is Phase 0.1.
 3. **Make `onStateChange` granular and structured.** Currently emits the full `IrisGridState` after any change. Add (additively, keep old callback) `onStateDidChange(change: IrisGridStateChange)` where `change` is `{ field, value, prev, source }` plus a `snapshot` getter. Critical so external code can distinguish its own writes from internal user changes without diffing the entire `IrisGridState`.
 4. **Stable serializable representations.** For every controllable field, define a serializable shape suitable for crossing the plugin boundary (Python/JS bridge). Lean on existing `dehydrate*` helpers in [IrisGridUtils.ts](../packages/iris-grid/src/IrisGridUtils.ts). Some fields (`formatter`, `model`) are not serializable as-is — they need either a "by-reference" handle or a dedicated codec. Document each in the registry.
 5. **Decide: where does the model live?** Recommendation: keep [IrisGridProxyModel.ts](../packages/iris-grid/src/IrisGridProxyModel.ts) and [IrisGridModelUpdater.tsx](../packages/iris-grid/src/IrisGridModelUpdater.tsx) unchanged. Plugins do **not** swap the model directly; they drive `rollupConfig` / `selectDistinctColumns` / `customColumns` etc. and the proxy reacts.
@@ -40,7 +40,7 @@ Phase 0 is intentionally **plumbing only**: registry + canonical mutator + granu
 7. **Make sidebar navigation controllable (no extraction yet).** The full extraction of the Table Options sidebar host into a parent-supplied component **cannot happen in Phase 0** — the built-in pages ([RollupRows](../packages/iris-grid/src/sidebar/RollupRows.tsx), [AggregationsBuilder](../packages/iris-grid/src/sidebar/aggregations), etc.) call `this.handleX` / `this.setState` directly on the `IrisGrid` class today. Until the imperative ref handle ships a public write surface for those pages to bind to, ripping them out of `IrisGrid` would just trade class-internal coupling for a sprawl of callback props piped across the new boundary — reinventing the very API the framework is supposed to define.
 
    What Phase 0 **can** do safely:
-   - Route the sidebar-nav fields (`isMenuShown`, `openOptions`) through `applyState(field, value, 'user')` as the first real callers of the new pipe. Built-in pages stay inline; they just stop calling private setters for those fields.
+   - Route the sidebar-nav fields (`isMenuShown`, `openOptions`) through `applyState(field, value, 'internal')` as the first real callers of the new pipe. Built-in pages stay inline; they just stop calling private setters for those fields.
    - Add `isMenuShown` and `openOptions` (the page stack) to the controllable-fields registry, so the [imperative ref handle](./DH-21476-02-imperative-ref-handle.md) automatically exposes sidebar navigation.
    - Document the sidebar-only scratch state that is **excluded** from the registry: `conditionalFormatEditIndex`, `conditionalFormatPreview`, `selectedAggregation`, gotoRow draft fields (`gotoRow`, `gotoValue`, `gotoValueSelectedColumnName`, `gotoValueSelectedFilter`, `gotoValueManuallyChanged`), download progress fields. Also exclude **derived fields** (e.g. `searchFilter`, which is composed from `searchValue` + `selectedSearchColumns` + `invertSearchColumns`) — these are recomputed from registered sources and have no independent identity. Built-in pages must not leak any of these through `onStateDidChange`.
 
@@ -92,7 +92,7 @@ npm run test
 ## Phase 0.1 — Handler migration
 
 Mechanically migrate every existing call site that mutates a registered
-field to flow through `applyState(field, value, 'user')` instead of
+field to flow through `applyState(field, value, 'internal')` instead of
 calling `this.setState({ field: value })` directly. This is the work
 that actually delivers the `onStateDidChange` guarantee from Phase 0's
 DoD for every field; until it lands, `onStateDidChange` only fires for
@@ -103,7 +103,7 @@ Done field-by-field rather than as one mega-PR. Each PR:
 1. Picks one registered field (or a tightly coupled group, e.g.
    `quickFilters` + `advancedFilters`).
 2. Replaces every `this.setState({ <field>: ... })` and `handle<Field>` /
-   `set<Field>` internal call with `this.applyState('<field>', value, 'user')`.
+   `set<Field>` internal call with `this.applyState('<field>', value, 'internal')`.
 3. Adds a regression test that asserts the corresponding
    `onStateDidChange` event fires with the right `prev` / `value` /
    `source` on the user gesture that drives that field.
@@ -116,7 +116,7 @@ Done field-by-field rather than as one mega-PR. Each PR:
   call sites in `IrisGrid.tsx`; all writes go through `applyState`.
 - The parametric conformance test from Phase 0 is extended to drive
   each field via its primary user gesture (synthetic event or method
-  call) and assert the event fires exactly once with `source: 'user'`.
+  call) and assert the event fires exactly once with `source: 'internal'`.
 - No behavior changes intended; full unit + snapshot suites pass.
 
 ### Phase 0.1 — Verification commands
@@ -178,7 +178,7 @@ Handle-specific files are listed in [DH-21476-02-imperative-ref-handle.md](./DH-
 - **Compat**: soft. New API in Phase 0 is additive. Existing imperative methods (`setFilters`, `handleRollupChange`, etc.), `IrisGridPanel.setStateOverrides`, and the current `IrisGridStateOverride` shape stay functional through the next minor releases. Deprecation policy for the handle lives in [DH-21476-02-imperative-ref-handle.md](./DH-21476-02-imperative-ref-handle.md).
 - **Model swaps**: not directly plugin-controllable. Plugins drive state (`rollupConfig`, `selectDistinctColumns`, etc.) and `IrisGridProxyModel` reacts. Custom model classes (à la `simple-pivot`) plug in via the `modelFactory` prop on `IrisGridPanel`/`GridWidgetPlugin`, not via live swap.
 - **Persistence**: lean on existing `dehydrate/hydrate` codecs in `IrisGridUtils`. The registry references them; we don't reinvent serialization.
-- **Loop protection**: every `apply` carries a `source: 'user' | 'external'` tag. The change event echoes it. The handle uses it to suppress redundant apply loops.
+- **Loop protection**: every `apply` carries a `source: 'internal' | 'external'` tag. The change event echoes it. The handle uses it to suppress redundant apply loops.
 - **`children` slot stays.** `<IrisGrid>{children}</IrisGrid>` continues to render a toolbar slot; we do **not** introduce a separate `toolbar` prop. `IrisGridControlContext` is the canonical state-access path for anything rendered into `children` (and for built-in descendants). Provider scope is the full `<IrisGrid>` render subtree.
 
 ## Open framework questions
