@@ -56,4 +56,20 @@
       box-shadow: 0 0 0 $border-width $gray-700;
     }
   }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: auto; // keep pointer events so the native title tooltip still works
+
+    &:hover {
+      background: transparent;
+      color: var(--dh-color-menu-item-fg);
+    }
+
+    &:focus {
+      box-shadow: none;
+      border-color: transparent;
+    }
+  }
 }

@@ -10,6 +10,10 @@ export type MenuItemDef = {
   title: string;
   subtitle?: string;
   icon?: IconProp;
+  /** When true the item is visually dimmed and clicks are ignored. */
+  disabled?: boolean;
+  /** Tooltip text shown on hover (rendered as the native `title` attribute). */
+  tooltip?: string;
 };
 
 export type SwitchMenuItemDef = MenuItemDef & {
@@ -37,17 +41,23 @@ export function MenuItem({
   'data-testid': dataTestId,
 }: MenuItemProps): JSX.Element {
   const { icon, subtitle, title } = item;
+  const { disabled = false, tooltip } = item;
   const handleSelect = useMemo(() => {
+    if (disabled) {
+      return () => {
+        // no-op when disabled
+      };
+    }
     if (isSwitchMenuItemType(item)) {
       return () => {
         item.onChange(!item.isOn);
       };
     }
     return onSelect;
-  }, [item, onSelect]);
+  }, [item, onSelect, disabled]);
   return (
     <div
-      className="btn btn-navigation-menu-item"
+      className={`btn btn-navigation-menu-item${disabled ? ' disabled' : ''}`}
       data-testid={`menu-item-${title}`}
       onClick={handleSelect}
       onKeyDown={event => {
@@ -55,8 +65,10 @@ export function MenuItem({
           handleSelect();
         }
       }}
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       role="menuitem"
+      aria-disabled={disabled || undefined}
+      title={tooltip}
     >
       {icon !== undefined && (
         <div className="icon">

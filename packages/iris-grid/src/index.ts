@@ -3,6 +3,7 @@ import IrisGrid from './LazyIrisGrid';
 export default IrisGrid;
 export { IrisGrid };
 export * from './sidebar';
+export * from './controllable';
 export * from './AdvancedFilterCreator';
 export * from './CommonTypes';
 export * from './mousehandlers';
