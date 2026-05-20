@@ -151,7 +151,7 @@ Each step: plugin page + state binding + Jest test + one Playwright e2e. After e
 ### Milestone 6 — Hardening (1 PR)
 
 - Performance pass: render-count instrumentation in the conformance suite. Threshold: ≤ N renders per `applyState` (set N empirically from a pre-plugin baseline).
-- Run the full `simple-pivot` and `ui` plugin test suites against the new `iris-grid` to confirm no compatibility breakage.
+- Run the full `pivot` and `ui` plugin test suites against the new `iris-grid` to confirm no compatibility breakage.
 - Documentation: README in the new plugin package, plus a "Replacing the Table Options sidebar" section in the iris-grid plugin docs.
 
 ---

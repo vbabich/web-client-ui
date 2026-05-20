@@ -215,7 +215,7 @@ and only depends on Phase 0.
 - [packages/dashboard-core-plugins/src/panels/FilterSetManagerPanel.tsx](../packages/dashboard-core-plugins/src/panels/FilterSetManagerPanel.tsx#L354) — current external caller of `setStateOverrides`; must keep working.
 - [packages/dashboard-core-plugins/src/GridWidgetPlugin.tsx](../packages/dashboard-core-plugins/src/GridWidgetPlugin.tsx) — non-panel entry; needs the same control surface.
 - [packages/plugin/src/TablePlugin.ts](../packages/plugin/src/TablePlugin.ts) — `TablePluginProps`; gains `irisGrid: IrisGridHandle` per the [imperative ref handle plan](./DH-21476-02-imperative-ref-handle.md).
-- `deephaven-plugins/plugins/ui/` and `deephaven-plugins/plugins/simple-pivot/` — external consumers; build & test against the new API in the handle plan's plugin-validation phase.
+- `deephaven-plugins/plugins/ui/` and `deephaven-plugins/plugins/pivot/` — external consumers; build & test against the new API in the handle plan's plugin-validation phase.
 
 New files (Phase 0):
 
@@ -230,7 +230,7 @@ Handle-specific files are listed in [DH-21476-02-imperative-ref-handle.md](./DH-
 ## Decisions
 
 - **Compat**: soft. New API in Phase 0 is additive. Existing imperative methods (`setFilters`, `handleRollupChange`, etc.), `IrisGridPanel.setStateOverrides`, and the current `IrisGridStateOverride` shape stay functional through the next minor releases. Deprecation policy for the handle lives in [DH-21476-02-imperative-ref-handle.md](./DH-21476-02-imperative-ref-handle.md).
-- **Model swaps**: not directly plugin-controllable. Plugins drive state (`rollupConfig`, `selectDistinctColumns`, etc.) and `IrisGridProxyModel` reacts. Custom model classes (à la `simple-pivot`) plug in via the `modelFactory` prop on `IrisGridPanel`/`GridWidgetPlugin`, not via live swap.
+- **Model swaps**: not directly plugin-controllable. Plugins drive state (`rollupConfig`, `selectDistinctColumns`, etc.) and `IrisGridProxyModel` reacts. Custom model classes (à la the `pivot` plugin) plug in via the `modelFactory` prop on `IrisGridPanel`/`GridWidgetPlugin`, not via live swap.
 - **Persistence**: lean on existing `dehydrate/hydrate` codecs in `IrisGridUtils`. The registry references them; we don't reinvent serialization.
 - **Loop protection**: every `apply` carries a `source: 'internal' | 'external'` tag. The change event echoes it. The handle uses it to suppress redundant apply loops.
 - **`children` slot stays.** `<IrisGrid>{children}</IrisGrid>` continues to render a toolbar slot; we do **not** introduce a separate `toolbar` prop. `IrisGridControlContext` is the canonical state-access path for anything rendered into `children` (and for built-in descendants). Provider scope is the full `<IrisGrid>` render subtree.

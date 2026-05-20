@@ -326,9 +326,9 @@ matches a baseline snapshot.
 ### Plugin compatibility
 
 Build `deephaven-plugins/plugins/ui` and
-`deephaven-plugins/plugins/simple-pivot` against the new
+`deephaven-plugins/plugins/pivot` against the new
 `@deephaven/iris-grid` and `@deephaven/plugin` packages and run
-`npm run test:unit -- --testPathPattern="plugins/(ui|simple-pivot)"`.
+`npm run test:unit -- --testPathPattern="plugins/(ui|pivot)"`.
 
 ---
 

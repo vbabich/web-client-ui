@@ -33,7 +33,7 @@ import { useTablePlugin } from './useTablePlugin';
 /**
  * Phase 0 (DH-21476) extension of `WidgetComponentProps` with a
  * controllable hook for plugins that need to wrap the base model
- * (e.g. simple-pivot's `IrisGridSimplePivotModel`). The default
+ * (e.g. the `pivot` plugin's custom `IrisGridModel`). The default
  * widget-plugin registration path does not pass `modelFactory`;
  * consumers that need it must render `GridWidgetPlugin` directly.
  */

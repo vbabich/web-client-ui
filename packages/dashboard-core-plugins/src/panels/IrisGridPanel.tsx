@@ -153,10 +153,10 @@ export interface OwnProps extends DashboardPanelProps {
    * Phase 0 (DH-21476) controllable hook. Receives the base model
    * resolved from `makeModel` and returns a (possibly wrapping)
    * model to drive the panel. Used by plugins that need a custom
-   * model implementation (e.g. simple-pivot's
-   * `IrisGridSimplePivotModel`) without live-swapping the model
-   * inside `IrisGrid` state. Sync return only — if you need to
-   * fetch additional data, do it inside `makeModel` first.
+   * model implementation (e.g. the `pivot` plugin's custom
+   * `IrisGridModel`) without live-swapping the model inside
+   * `IrisGrid` state. Sync return only — if you need to fetch
+   * additional data, do it inside `makeModel` first.
    */
   modelFactory?: (baseModel: IrisGridModel) => IrisGridModel;
 
